@@ -3,6 +3,7 @@ import { useSettings } from './hooks/useSettings.ts';
 import { useWebSocket } from './hooks/useWebSocket.ts';
 import { useAudioCapture } from './hooks/useAudioCapture.ts';
 import { useActivation } from './hooks/useActivation.ts';
+import { useVAD } from './hooks/useVAD.ts';
 import { StatusBar } from './components/StatusBar.tsx';
 import { AudioCapture } from './components/AudioCapture.tsx';
 import { WaveformVisualizer } from './components/WaveformVisualizer.tsx';
@@ -42,6 +43,7 @@ function App() {
 
   const {
     recordingState,
+    setRecordingState,
     triggerStart,
     triggerStop,
   } = useActivation({
@@ -57,6 +59,16 @@ function App() {
       chunkInterval: 250,
     });
 
+  // VAD integration: monitor audio stream when in VAD mode
+  const { audioLevel } = useVAD({
+    audioStream,
+    vadThreshold: settings.vadThreshold,
+    silenceTimeout: settings.silenceTimeout,
+    enabled: settings.activationMode === 'vad',
+    onSpeechStart: triggerStart,
+    onSpeechEnd: triggerStop,
+  });
+
   // Keep refs in sync
   useEffect(() => {
     startRecordingRef.current = startRecording;
@@ -65,6 +77,23 @@ function App() {
   useEffect(() => {
     stopRecordingRef.current = stopRecording;
   }, [stopRecording]);
+
+  // Transition processing -> idle when a transcription result arrives
+  useEffect(() => {
+    if (lastResult && recordingState === 'processing') {
+      setRecordingState('idle');
+    }
+  }, [lastResult, recordingState, setRecordingState]);
+
+  // For VAD mode, we need the audio stream to be active for monitoring.
+  // Start recording (mic stream) when VAD mode is selected,
+  // stop when leaving VAD mode.
+  useEffect(() => {
+    if (settings.activationMode === 'vad') {
+      startRecordingRef.current();
+    }
+    // Cleanup on mode change away from VAD is handled by useVAD cleanup
+  }, [settings.activationMode]);
 
   const handleToggle = useCallback(() => {
     if (recordingState === 'recording') {
@@ -87,6 +116,8 @@ function App() {
           activationMode={settings.activationMode}
           onToggle={handleToggle}
           permissionState={permissionState}
+          hotkey={settings.hotkey}
+          audioLevel={audioLevel}
         />
 
         <WaveformVisualizer

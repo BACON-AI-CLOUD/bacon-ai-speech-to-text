@@ -24,6 +24,12 @@ export function useActivation({
   const [recordingState, setRecordingState] = useState<RecordingState>('idle');
   const isActiveRef = useRef(false);
 
+  // Reset state when mode changes
+  useEffect(() => {
+    setRecordingState('idle');
+    isActiveRef.current = false;
+  }, [mode]);
+
   const triggerStart = useCallback(() => {
     if (recordingState === 'recording') return;
     isActiveRef.current = true;
@@ -36,11 +42,8 @@ export function useActivation({
     isActiveRef.current = false;
     setRecordingState('processing');
     onStop();
-    // Transition back to idle after a short delay
-    // (the actual transition from processing->idle happens when result arrives)
-    setTimeout(() => {
-      setRecordingState((prev) => (prev === 'processing' ? 'idle' : prev));
-    }, 3000);
+    // No setTimeout fallback: processing->idle transition is driven by
+    // setRecordingState('idle') called from App.tsx when a result arrives
   }, [recordingState, onStop]);
 
   // Push-to-talk: key held = recording, key released = stop
@@ -108,8 +111,8 @@ export function useActivation({
     };
   }, [mode, triggerStart, triggerStop]);
 
-  // VAD mode: placeholder for Phase B integration
-  // VAD activation will be handled by @ricky0123/vad-web in a future phase
+  // VAD mode: triggerStart/triggerStop are called externally by useVAD via App.tsx
+  // No keyboard listeners needed for VAD mode.
 
   return {
     recordingState,

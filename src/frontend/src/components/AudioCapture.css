@@ -6,6 +6,14 @@
   padding: 32px 0;
 }
 
+/* Button container for positioning the VAD ring */
+.mic-button-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .mic-button {
   width: 100px;
   height: 100px;
@@ -18,6 +26,8 @@
   align-items: center;
   justify-content: center;
   transition: all 0.2s ease;
+  position: relative;
+  z-index: 2;
 }
 
 .mic-button:hover:not(:disabled) {
@@ -31,6 +41,15 @@
   cursor: not-allowed;
 }
 
+/* VAD mode: mic button is not clickable but should look active */
+.mic-button--vad {
+  opacity: 1 !important;
+  cursor: default;
+  border-color: #4caf50;
+  background: #1a2a1e;
+  color: #4caf50;
+}
+
 .mic-button--recording {
   border-color: #f44336;
   background: #2a1a1a;
@@ -42,13 +61,35 @@
   border-color: #ffc107;
   background: #2a2a1a;
   color: #ffc107;
-  animation: mic-pulse 0.8s ease-in-out infinite;
 }
 
 .mic-icon {
   pointer-events: none;
 }
 
+/* Processing spinner */
+.processing-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid #ffc10744;
+  border-top-color: #ffc107;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+/* VAD level ring around button */
+.vad-level-ring {
+  position: absolute;
+  width: 110px;
+  height: 110px;
+  border-radius: 50%;
+  border: 2px solid #4caf50;
+  z-index: 1;
+  transition: transform 0.1s ease-out, opacity 0.2s ease;
+  pointer-events: none;
+}
+
+/* Recording state label */
 .recording-state {
   font-size: 1.1rem;
   font-weight: 600;
@@ -67,11 +108,41 @@
   color: #ffc107;
 }
 
+/* VAD audio level bar */
+.vad-level-bar-container {
+  width: 200px;
+  height: 8px;
+  background: #222;
+  border-radius: 4px;
+  overflow: hidden;
+  position: relative;
+}
+
+.vad-level-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #4caf50, #ffc107, #f44336);
+  border-radius: 4px;
+  transition: width 0.05s ease-out;
+  min-width: 0;
+}
+
+.vad-level-label {
+  position: absolute;
+  top: -18px;
+  left: 0;
+  font-size: 0.65rem;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+/* Mode hint */
 .mode-hint {
   font-size: 0.8rem;
   color: #666;
 }
 
+/* Permission warning */
 .permission-warning {
   color: #f44336;
   font-size: 0.85rem;
@@ -81,11 +152,18 @@
   border: 1px solid #f4433644;
 }
 
+/* Animations */
 @keyframes mic-pulse {
   0%, 100% {
     box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.4);
   }
   50% {
     box-shadow: 0 0 0 12px rgba(244, 67, 54, 0);
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
   }
 }
