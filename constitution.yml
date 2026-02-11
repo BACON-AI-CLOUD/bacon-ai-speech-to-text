@@ -1,0 +1,57 @@
+# constitution.yml - Living rule definitions with evolution metadata
+# Part of the BACON-AI AI Coding Orchestrator self-annealing architecture
+version: "1.0"
+last_evolved: "2026-02-11"
+evolution_cycle: quarterly
+
+rules:
+  - id: "CP-6-HIGH-001"
+    pattern: "should work"
+    severity: high
+    action: block
+    priority: 90
+    created: "2026-02-11"
+    false_positive_rate: 0.0
+    true_positive_rate: 1.0
+
+  - id: "CP-6-HIGH-002"
+    pattern: "is now functional"
+    severity: high
+    action: block
+    priority: 95
+    created: "2026-02-11"
+    false_positive_rate: 0.0
+    true_positive_rate: 1.0
+
+  - id: "CP-6-HIGH-003"
+    pattern: "everything is working"
+    severity: high
+    action: block
+    priority: 90
+    created: "2026-02-11"
+    false_positive_rate: 0.0
+    true_positive_rate: 1.0
+
+  - id: "CP-6-SYCO-001"
+    pattern: "truly functional"
+    severity: sycophancy
+    action: warn
+    priority: 70
+    created: "2026-02-11"
+    false_positive_rate: 0.15
+    true_positive_rate: 0.85
+
+evolution_triggers:
+  promote_to_high:
+    condition: "true_positive_rate > 0.9 AND false_positive_rate < 0.1 for 30 days"
+    action: "Increase severity or priority"
+  demote_or_remove:
+    condition: "false_positive_rate > 0.3 for 30 days"
+    action: "Reduce priority, change action to warn, or remove rule"
+  add_new_rule:
+    condition: "Same uncaught pattern appears in 3+ incidents"
+    action: "Propose new rule via PR to constitution.yml"
+    requires_human_approval: true
+  seasonal_review:
+    schedule: "quarterly"
+    action: "Review all rules, prune unused, update rates from logs"

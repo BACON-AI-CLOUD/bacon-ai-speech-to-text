@@ -1,0 +1,15 @@
+# CODEOWNERS - Risk-based review routing
+# Changes to these paths require review from the specified teams/individuals
+# Used by the complexity classifier for auto-escalation to CRITICAL tier
+
+# Critical paths (auto-escalate to CRITICAL tier)
+# /src/auth/           @security-team
+# /src/payments/       @security-team
+# /migrations/         @db-admin
+# /.github/workflows/  @devops-lead
+# /constitution.yml    @framework-maintainer
+
+# Standard paths
+# /src/                @dev-team
+# /tests/              @dev-team
+# /docs/               @dev-team
