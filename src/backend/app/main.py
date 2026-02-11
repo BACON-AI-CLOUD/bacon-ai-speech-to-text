@@ -2,14 +2,18 @@
 BACON-AI Voice Backend - FastAPI Application
 
 Provides REST and WebSocket endpoints for speech-to-text transcription
-using Faster-Whisper with GPU acceleration.
+using Faster-Whisper with GPU acceleration, plus integration backends
+for routing transcribed text to Claude API, Claude Code, or MCP tools.
 
 Endpoints:
-    GET  /health           - Server health and status
-    GET  /models           - Available Whisper models
-    POST /models/{name}/load - Load/switch Whisper model
-    POST /transcribe       - Transcribe uploaded audio file
-    WS   /ws/audio         - WebSocket for real-time audio streaming
+    GET  /health              - Server health and status
+    GET  /models              - Available Whisper models
+    POST /models/{name}/load  - Load/switch Whisper model
+    POST /transcribe          - Transcribe uploaded audio file
+    POST /chat                - Send message to Claude API (FEAT-006)
+    GET  /integrations        - List available integration backends
+    POST /integrations/send   - Send text to selected backend
+    WS   /ws/audio            - WebSocket for real-time audio streaming
 """
 
 import asyncio
@@ -19,11 +23,12 @@ import tempfile
 from contextlib import asynccontextmanager
 from dataclasses import asdict
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from fastapi import FastAPI, File, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 
 from .audio.converter import (
     concatenate_webm_to_wav,
@@ -38,9 +43,31 @@ from .config import (
     detect_gpu,
     load_settings,
 )
+from .integrations.router import get_router
 from .stt.whisper_engine import WhisperEngine, get_engine
 
 logger = logging.getLogger(__name__)
+
+
+# =============================================================================
+# Request / Response Models for Integration Endpoints
+# =============================================================================
+
+
+class ChatRequest(BaseModel):
+    """Request body for the /chat endpoint."""
+
+    text: str
+    system_prompt: Optional[str] = None
+    model: Optional[str] = None
+
+
+class IntegrationSendRequest(BaseModel):
+    """Request body for the /integrations/send endpoint."""
+
+    text: str
+    backend: Optional[str] = None
+    options: Optional[Dict[str, Any]] = None
 
 
 # =============================================================================
@@ -260,6 +287,95 @@ async def transcribe(file: UploadFile = File(...)) -> Dict[str, Any]:
             tmp_path.unlink()
         except OSError:
             pass
+
+
+# =============================================================================
+# Integration Endpoints (FEAT-006 / 007 / 008)
+# =============================================================================
+
+
+@app.post("/chat")
+async def chat(request: ChatRequest) -> Dict[str, Any]:
+    """
+    Send a message to Claude API and return the response.
+
+    This is a convenience endpoint that always uses the claude-api backend.
+
+    Args:
+        request: ChatRequest with text, optional system_prompt and model.
+    """
+    router = get_router()
+    metadata: Dict[str, Any] = {}
+    if request.system_prompt:
+        metadata["system_prompt"] = request.system_prompt
+    if request.model:
+        metadata["model"] = request.model
+
+    result = await router.send(
+        text=request.text, backend="claude-api", metadata=metadata
+    )
+
+    if not result.get("success"):
+        return JSONResponse(
+            status_code=502,
+            content={
+                "error": result.get("message", "Claude API error"),
+                "response": result.get("response", ""),
+                "model": result.get("model", ""),
+                "usage": result.get("usage", {}),
+            },
+        )
+
+    return {
+        "response": result.get("response", ""),
+        "model": result.get("model", ""),
+        "usage": result.get("usage", {}),
+    }
+
+
+@app.get("/integrations")
+async def list_integrations() -> Dict[str, Any]:
+    """
+    List all available integration backends and the currently active one.
+    """
+    router = get_router()
+    return {
+        "backends": router.list_backends(),
+        "active": router.active_backend,
+    }
+
+
+@app.post("/integrations/send")
+async def integrations_send(request: IntegrationSendRequest) -> Dict[str, Any]:
+    """
+    Send text to the specified (or active) integration backend.
+
+    Args:
+        request: IntegrationSendRequest with text, optional backend, and options.
+    """
+    router = get_router()
+    metadata = request.options or {}
+
+    result = await router.send(
+        text=request.text,
+        backend=request.backend,
+        metadata=metadata,
+    )
+
+    if not result.get("success"):
+        return JSONResponse(
+            status_code=502,
+            content={
+                "error": result.get("message", "Integration error"),
+                "response": result.get("response", ""),
+                "backend": result.get("backend", ""),
+            },
+        )
+
+    return {
+        "response": result.get("response", ""),
+        "backend": result.get("backend", ""),
+    }
 
 
 # =============================================================================
