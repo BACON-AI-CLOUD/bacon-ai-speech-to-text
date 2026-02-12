@@ -4,6 +4,8 @@ import './TranscriptionDisplay.css';
 
 interface TranscriptionDisplayProps {
   lastResult: TranscriptionResult | null;
+  notificationsEnabled?: boolean;
+  autoCopy?: boolean;
 }
 
 function formatTimestamp(ts: number): string {
@@ -17,21 +19,49 @@ function confidenceBadgeClass(confidence: number): string {
   return 'confidence-badge--low';
 }
 
-export function TranscriptionDisplay({ lastResult }: TranscriptionDisplayProps) {
+export function TranscriptionDisplay({
+  lastResult,
+  notificationsEnabled = false,
+  autoCopy = false,
+}: TranscriptionDisplayProps) {
   const [history, setHistory] = useState<TranscriptionResult[]>([]);
   const [editText, setEditText] = useState('');
   const [copied, setCopied] = useState(false);
   const historyRef = useRef<HTMLDivElement>(null);
+  const prevResultRef = useRef<TranscriptionResult | null>(null);
+
+  // Request notification permission when enabled
+  useEffect(() => {
+    if (notificationsEnabled && typeof Notification !== 'undefined' && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  }, [notificationsEnabled]);
 
   useEffect(() => {
-    if (lastResult && lastResult.text.trim()) {
+    if (lastResult && lastResult.text.trim() && lastResult !== prevResultRef.current) {
+      prevResultRef.current = lastResult;
       setEditText(lastResult.text);
       setHistory((prev) => {
         const updated = [lastResult, ...prev];
         return updated.slice(0, 10);
       });
+
+      // Auto-copy to clipboard
+      if (autoCopy && navigator.clipboard) {
+        navigator.clipboard.writeText(lastResult.text).catch(() => {
+          // Clipboard API may not be available
+        });
+      }
+
+      // Browser notification
+      if (notificationsEnabled && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+        new Notification('BACON-AI Voice', {
+          body: lastResult.text.slice(0, 100),
+          tag: 'bacon-voice-transcription',
+        });
+      }
     }
-  }, [lastResult]);
+  }, [lastResult, autoCopy, notificationsEnabled]);
 
   const handleCopy = async () => {
     try {

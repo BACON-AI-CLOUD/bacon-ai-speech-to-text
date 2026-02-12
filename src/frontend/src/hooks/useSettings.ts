@@ -25,6 +25,14 @@ function saveSettings(settings: AppSettings): void {
   }
 }
 
+/** Validate that an object has at least one valid AppSettings key */
+function isValidSettingsPartial(obj: unknown): obj is Partial<AppSettings> {
+  if (typeof obj !== 'object' || obj === null || Array.isArray(obj)) return false;
+  const validKeys = Object.keys(DEFAULT_SETTINGS);
+  const objKeys = Object.keys(obj);
+  return objKeys.some((key) => validKeys.includes(key));
+}
+
 export function useSettings() {
   const [settings, setSettings] = useState<AppSettings>(loadSettings);
 
@@ -40,5 +48,32 @@ export function useSettings() {
     setSettings({ ...DEFAULT_SETTINGS });
   }, []);
 
-  return { settings, updateSettings, resetSettings };
+  const exportSettings = useCallback(() => {
+    const json = JSON.stringify(settings, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'bacon-voice-settings.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, [settings]);
+
+  const importSettings = useCallback(async (file: File): Promise<boolean> => {
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      if (!isValidSettingsPartial(parsed)) {
+        return false;
+      }
+      setSettings({ ...DEFAULT_SETTINGS, ...parsed });
+      return true;
+    } catch {
+      return false;
+    }
+  }, []);
+
+  return { settings, updateSettings, resetSettings, exportSettings, importSettings };
 }

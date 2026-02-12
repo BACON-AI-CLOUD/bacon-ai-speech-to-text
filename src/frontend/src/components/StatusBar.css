@@ -59,6 +59,12 @@
   color: #ff9800;
 }
 
+.status-bar__hint {
+  font-size: 0.75rem;
+  color: #ff9800;
+  font-style: italic;
+}
+
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.4; }

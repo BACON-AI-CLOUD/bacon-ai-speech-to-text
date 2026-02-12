@@ -1,4 +1,4 @@
-import { useCallback, useRef, useEffect } from 'react';
+import { useCallback, useRef, useEffect, useState } from 'react';
 import { useSettings } from './hooks/useSettings.ts';
 import { useWebSocket } from './hooks/useWebSocket.ts';
 import { useAudioCapture } from './hooks/useAudioCapture.ts';
@@ -10,10 +10,12 @@ import { WaveformVisualizer } from './components/WaveformVisualizer.tsx';
 import { TranscriptionDisplay } from './components/TranscriptionDisplay.tsx';
 import { SettingsPanel } from './components/SettingsPanel.tsx';
 import { ErrorDisplay } from './components/ErrorDisplay.tsx';
+import { ModelProgress } from './components/ModelProgress.tsx';
+import type { ModelDownloadProgress } from './types/index.ts';
 import './App.css';
 
 function App() {
-  const { settings, updateSettings, resetSettings } = useSettings();
+  const { settings, updateSettings, resetSettings, exportSettings, importSettings } = useSettings();
 
   const {
     connectionState,
@@ -22,10 +24,75 @@ function App() {
     lastResult,
     lastError,
     serverStatus,
+    reconnectAttempt,
+    connect,
   } = useWebSocket({
     url: settings.backendUrl,
     autoConnect: true,
   });
+
+  // Model download progress state
+  const [modelProgress, setModelProgress] = useState<ModelDownloadProgress | null>(null);
+  const modelPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Poll for model download progress when model changes
+  const prevModelRef = useRef(settings.selectedModel);
+  useEffect(() => {
+    if (settings.selectedModel !== prevModelRef.current) {
+      prevModelRef.current = settings.selectedModel;
+      setModelProgress({
+        modelName: settings.selectedModel,
+        percentage: 0,
+        downloading: true,
+      });
+
+      // Poll the REST endpoint
+      const backendHttp = settings.backendUrl
+        .replace('ws://', 'http://')
+        .replace('wss://', 'https://');
+
+      let attempts = 0;
+      modelPollRef.current = setInterval(async () => {
+        attempts++;
+        try {
+          const res = await fetch(`${backendHttp}/models`);
+          if (res.ok) {
+            const data = await res.json();
+            const model = data?.models?.find(
+              (m: { name: string; loaded: boolean }) => m.name === settings.selectedModel,
+            );
+            if (model?.loaded) {
+              setModelProgress(null);
+              if (modelPollRef.current) clearInterval(modelPollRef.current);
+            } else {
+              // Simulate progress based on poll attempts
+              setModelProgress((prev) =>
+                prev
+                  ? { ...prev, percentage: Math.min(95, attempts * 10) }
+                  : null,
+              );
+            }
+          }
+        } catch {
+          // Backend not reachable - stop polling after a while
+          if (attempts > 15) {
+            setModelProgress(null);
+            if (modelPollRef.current) clearInterval(modelPollRef.current);
+          }
+        }
+      }, 2000);
+
+      // Cleanup after 60s max
+      setTimeout(() => {
+        setModelProgress(null);
+        if (modelPollRef.current) clearInterval(modelPollRef.current);
+      }, 60000);
+    }
+
+    return () => {
+      if (modelPollRef.current) clearInterval(modelPollRef.current);
+    };
+  }, [settings.selectedModel, settings.backendUrl]);
 
   // Use refs so activation callbacks always have latest functions
   const startRecordingRef = useRef<() => Promise<void>>(async () => {});
@@ -103,11 +170,20 @@ function App() {
     }
   }, [recordingState, triggerStart, triggerStop]);
 
+  // Retry handler for error display
+  const handleRetry = useCallback(() => {
+    connect();
+  }, [connect]);
+
   return (
     <div className="app">
       <header className="app-header">
         <h1 className="app-title">BACON-AI Voice</h1>
-        <StatusBar connectionState={connectionState} serverStatus={serverStatus} />
+        <StatusBar
+          connectionState={connectionState}
+          serverStatus={serverStatus}
+          reconnectAttempt={reconnectAttempt}
+        />
       </header>
 
       <main className="app-main">
@@ -125,16 +201,24 @@ function App() {
           isRecording={recordingState === 'recording'}
         />
 
-        <TranscriptionDisplay lastResult={lastResult} />
+        <ModelProgress progress={modelProgress} />
+
+        <TranscriptionDisplay
+          lastResult={lastResult}
+          notificationsEnabled={settings.notificationsEnabled}
+          autoCopy={settings.autoCopy}
+        />
 
         <SettingsPanel
           settings={settings}
           onUpdate={updateSettings}
           onReset={resetSettings}
+          onExport={exportSettings}
+          onImport={importSettings}
         />
       </main>
 
-      <ErrorDisplay error={lastError} />
+      <ErrorDisplay error={lastError} onRetry={handleRetry} />
     </div>
   );
 }
