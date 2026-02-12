@@ -24,6 +24,21 @@
   animation: toast-in 0.3s ease;
 }
 
+.error-toast--connection {
+  border-color: #ff980044;
+  color: #ffb74d;
+}
+
+.error-toast--permission {
+  border-color: #e91e6344;
+  color: #f48fb1;
+}
+
+.error-toast--transcription {
+  border-color: #ffc10744;
+  color: #fff176;
+}
+
 .error-toast__icon {
   width: 22px;
   height: 22px;
@@ -38,8 +53,38 @@
   flex-shrink: 0;
 }
 
+.error-toast--connection .error-toast__icon {
+  background: #ff980033;
+  color: #ff9800;
+}
+
+.error-toast--permission .error-toast__icon {
+  background: #e91e6333;
+  color: #e91e63;
+}
+
+.error-toast--transcription .error-toast__icon {
+  background: #ffc10733;
+  color: #ffc107;
+}
+
 .error-toast__message {
   flex: 1;
+}
+
+.error-toast__retry {
+  background: #ffffff15;
+  border: 1px solid #ffffff30;
+  color: inherit;
+  cursor: pointer;
+  font-size: 0.8rem;
+  padding: 3px 10px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.error-toast__retry:hover {
+  background: #ffffff25;
 }
 
 .error-toast__dismiss {

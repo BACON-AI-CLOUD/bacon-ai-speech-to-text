@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { TranscriptionDisplay } from '../TranscriptionDisplay.tsx';
 import type { TranscriptionResult } from '../../types/index.ts';
@@ -80,5 +80,44 @@ describe('TranscriptionDisplay', () => {
 
     expect(screen.getByText(/de/)).toBeInTheDocument();
     expect(screen.getByText(/3\.7s/)).toBeInTheDocument();
+  });
+
+  // === FEAT-009: Auto-copy and Notifications ===
+
+  it('auto-copies to clipboard when autoCopy is true', () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText },
+      writable: true,
+      configurable: true,
+    });
+
+    const result = makeResult({ text: 'Auto-copied text' });
+    render(<TranscriptionDisplay lastResult={result} autoCopy={true} />);
+
+    expect(writeText).toHaveBeenCalledWith('Auto-copied text');
+  });
+
+  it('shows browser notification when notificationsEnabled is true', () => {
+    // Mock Notification
+    const NotificationMock = vi.fn();
+    Object.defineProperty(NotificationMock, 'permission', {
+      value: 'granted',
+      configurable: true,
+    });
+    NotificationMock.requestPermission = vi.fn();
+    vi.stubGlobal('Notification', NotificationMock);
+
+    const result = makeResult({ text: 'Notification text' });
+    render(
+      <TranscriptionDisplay lastResult={result} notificationsEnabled={true} />,
+    );
+
+    expect(NotificationMock).toHaveBeenCalledWith('BACON-AI Voice', {
+      body: 'Notification text',
+      tag: 'bacon-voice-transcription',
+    });
+
+    vi.unstubAllGlobals();
   });
 });

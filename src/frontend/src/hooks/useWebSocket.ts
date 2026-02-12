@@ -18,6 +18,7 @@ interface UseWebSocketReturn {
   lastResult: TranscriptionResult | null;
   lastError: string | null;
   serverStatus: ServerStatus | null;
+  reconnectAttempt: number;
   connect: () => void;
   disconnect: () => void;
 }
@@ -36,6 +37,7 @@ export function useWebSocket({
   );
   const [lastError, setLastError] = useState<string | null>(null);
   const [serverStatus, setServerStatus] = useState<ServerStatus | null>(null);
+  const [reconnectAttempt, setReconnectAttempt] = useState(0);
 
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectAttemptRef = useRef(0);
@@ -69,6 +71,7 @@ export function useWebSocket({
       ws.onopen = () => {
         setConnectionState('connected');
         reconnectAttemptRef.current = 0;
+        setReconnectAttempt(0);
       };
 
       ws.onmessage = (event: MessageEvent) => {
@@ -109,6 +112,7 @@ export function useWebSocket({
             MAX_RECONNECT_DELAY,
           );
           reconnectAttemptRef.current += 1;
+          setReconnectAttempt(reconnectAttemptRef.current);
           reconnectTimerRef.current = setTimeout(() => {
             connect();
           }, delay);
@@ -133,6 +137,7 @@ export function useWebSocket({
     intentionalCloseRef.current = true;
     clearReconnectTimer();
     reconnectAttemptRef.current = 0;
+    setReconnectAttempt(0);
     if (wsRef.current) {
       wsRef.current.close();
       wsRef.current = null;
@@ -174,6 +179,7 @@ export function useWebSocket({
     lastResult,
     lastError,
     serverStatus,
+    reconnectAttempt,
     connect,
     disconnect,
   };

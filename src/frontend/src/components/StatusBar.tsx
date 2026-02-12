@@ -4,14 +4,17 @@ import './StatusBar.css';
 interface StatusBarProps {
   connectionState: ConnectionState;
   serverStatus: ServerStatus | null;
+  reconnectAttempt?: number;
 }
 
-function connectionLabel(state: ConnectionState): string {
+function connectionLabel(state: ConnectionState, reconnectAttempt: number): string {
   switch (state) {
     case 'connected':
       return 'Connected';
     case 'connecting':
-      return 'Connecting...';
+      return reconnectAttempt > 0
+        ? `Reconnecting (attempt ${reconnectAttempt})...`
+        : 'Connecting...';
     case 'disconnected':
       return 'Disconnected';
     case 'error':
@@ -19,13 +22,17 @@ function connectionLabel(state: ConnectionState): string {
   }
 }
 
-export function StatusBar({ connectionState, serverStatus }: StatusBarProps) {
+export function StatusBar({ connectionState, serverStatus, reconnectAttempt = 0 }: StatusBarProps) {
   return (
     <div className="status-bar">
       <div className="status-bar__connection">
         <span className={`status-dot status-dot--${connectionState}`} />
-        <span className="status-bar__label">{connectionLabel(connectionState)}</span>
+        <span className="status-bar__label">{connectionLabel(connectionState, reconnectAttempt)}</span>
       </div>
+
+      {connectionState === 'disconnected' && (
+        <span className="status-bar__hint">Backend offline - run ./start.sh to start</span>
+      )}
 
       {serverStatus && (
         <>

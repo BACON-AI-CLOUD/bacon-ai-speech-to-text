@@ -1,11 +1,14 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type { AppSettings, ActivationMode } from '../types/index.ts';
+import { formatKeyName } from '../utils/keys.ts';
 import './SettingsPanel.css';
 
 interface SettingsPanelProps {
   settings: AppSettings;
   onUpdate: (updates: Partial<AppSettings>) => void;
   onReset: () => void;
+  onExport?: () => void;
+  onImport?: (file: File) => Promise<boolean>;
 }
 
 const MODELS = [
@@ -22,8 +25,85 @@ const ACTIVATION_MODES: { value: ActivationMode; label: string }[] = [
   { value: 'vad', label: 'Voice Activity Detection (Phase B)' },
 ];
 
-export function SettingsPanel({ settings, onUpdate, onReset }: SettingsPanelProps) {
+function KeyCaptureButton({
+  currentKey,
+  onCapture,
+}: {
+  currentKey: string;
+  onCapture: (code: string) => void;
+}) {
+  const [listening, setListening] = useState(false);
+
+  const handleClick = useCallback(() => {
+    setListening(true);
+  }, []);
+
+  useEffect(() => {
+    if (!listening) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      if (e.code === 'Escape') {
+        setListening(false);
+        return;
+      }
+
+      onCapture(e.code);
+      setListening(false);
+    };
+
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown, true);
+    };
+  }, [listening, onCapture]);
+
+  return (
+    <div className="key-capture">
+      <button
+        className={`key-capture__button ${listening ? 'key-capture__button--listening' : ''}`}
+        onClick={handleClick}
+        type="button"
+      >
+        {listening ? 'Press a key...' : formatKeyName(currentKey)}
+      </button>
+      {currentKey !== 'Space' && (
+        <button
+          className="key-capture__reset"
+          onClick={() => onCapture('Space')}
+          type="button"
+          title="Reset to default (Space)"
+        >
+          Reset
+        </button>
+      )}
+    </div>
+  );
+}
+
+export function SettingsPanel({ settings, onUpdate, onReset, onExport, onImport }: SettingsPanelProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [importStatus, setImportStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImport = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file || !onImport) return;
+
+      const success = await onImport(file);
+      setImportStatus(success ? 'success' : 'error');
+      setTimeout(() => setImportStatus('idle'), 3000);
+
+      // Reset file input so the same file can be selected again
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    },
+    [onImport],
+  );
 
   return (
     <div className="settings-panel">
@@ -60,14 +140,11 @@ export function SettingsPanel({ settings, onUpdate, onReset }: SettingsPanelProp
           {settings.activationMode === 'push-to-talk' && (
             <div className="settings-group">
               <label className="settings-label">Hotkey</label>
-              <input
-                className="settings-input"
-                type="text"
-                value={settings.hotkey}
-                onChange={(e) => onUpdate({ hotkey: e.target.value })}
-                placeholder="e.g. Space, KeyF"
+              <KeyCaptureButton
+                currentKey={settings.hotkey}
+                onCapture={(code) => onUpdate({ hotkey: code })}
               />
-              <span className="settings-hint">Use KeyCode values (e.g. Space, KeyF, KeyR)</span>
+              <span className="settings-hint">Click the button, then press the desired key. Escape to cancel.</span>
             </div>
           )}
 
@@ -137,12 +214,69 @@ export function SettingsPanel({ settings, onUpdate, onReset }: SettingsPanelProp
             />
           </div>
 
+          {/* Auto-copy toggle */}
+          <div className="settings-group settings-group--inline">
+            <label className="settings-label settings-label--toggle">
+              <input
+                type="checkbox"
+                checked={settings.autoCopy}
+                onChange={(e) => onUpdate({ autoCopy: e.target.checked })}
+              />
+              Auto-copy transcriptions
+            </label>
+          </div>
+
+          {/* Notifications toggle */}
+          <div className="settings-group settings-group--inline">
+            <label className="settings-label settings-label--toggle">
+              <input
+                type="checkbox"
+                checked={settings.notificationsEnabled}
+                onChange={(e) => onUpdate({ notificationsEnabled: e.target.checked })}
+              />
+              Browser notifications
+            </label>
+          </div>
+
           {/* Action Buttons */}
           <div className="settings-actions">
+            {onExport && (
+              <button className="btn btn--secondary" onClick={onExport}>
+                Export Settings
+              </button>
+            )}
+            {onImport && (
+              <>
+                <button
+                  className="btn btn--secondary"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  Import Settings
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".json"
+                  style={{ display: 'none' }}
+                  onChange={handleImport}
+                />
+              </>
+            )}
             <button className="btn btn--secondary" onClick={onReset}>
               Reset to Defaults
             </button>
           </div>
+
+          {importStatus === 'success' && (
+            <div className="settings-feedback settings-feedback--success">
+              Settings imported successfully.
+            </div>
+          )}
+          {importStatus === 'error' && (
+            <div className="settings-feedback settings-feedback--error">
+              Failed to import settings. Invalid file format.
+            </div>
+          )}
         </div>
       )}
     </div>

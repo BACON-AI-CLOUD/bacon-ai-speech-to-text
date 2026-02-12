@@ -42,6 +42,8 @@ export interface AppSettings {
   selectedModel: string;
   integrationBackend: string;
   backendUrl: string;
+  notificationsEnabled: boolean;
+  autoCopy: boolean;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -52,7 +54,17 @@ export const DEFAULT_SETTINGS: AppSettings = {
   selectedModel: 'base',
   integrationBackend: 'claude-api',
   backendUrl: 'ws://localhost:8765',
+  notificationsEnabled: false,
+  autoCopy: false,
 };
+
+export type ErrorCategory = 'connection' | 'permission' | 'transcription' | 'unknown';
+
+export interface ModelDownloadProgress {
+  modelName: string;
+  percentage: number;
+  downloading: boolean;
+}
 
 export interface WebSocketMessage {
   type: 'status' | 'result' | 'error' | 'control';
