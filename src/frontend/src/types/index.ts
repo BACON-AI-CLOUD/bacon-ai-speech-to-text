@@ -44,6 +44,7 @@ export interface AppSettings {
   backendUrl: string;
   notificationsEnabled: boolean;
   autoCopy: boolean;
+  typeToKeyboard: boolean;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -56,6 +57,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   backendUrl: 'ws://localhost:8765',
   notificationsEnabled: false,
   autoCopy: false,
+  typeToKeyboard: false,
 };
 
 export type ErrorCategory = 'connection' | 'permission' | 'transcription' | 'unknown';

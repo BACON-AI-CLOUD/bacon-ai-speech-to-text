@@ -13,6 +13,7 @@ Endpoints:
     POST /chat                - Send message to Claude API (FEAT-006)
     GET  /integrations        - List available integration backends
     POST /integrations/send   - Send text to selected backend
+    POST /recording/toggle    - Toggle recording on all connected WS clients
     WS   /ws/audio            - WebSocket for real-time audio streaming
 """
 
@@ -44,6 +45,7 @@ from .config import (
     load_settings,
 )
 from .integrations.router import get_router
+from .keyboard import KeyboardEmulator
 from .stt.whisper_engine import WhisperEngine, get_engine
 
 logger = logging.getLogger(__name__)
@@ -68,6 +70,12 @@ class IntegrationSendRequest(BaseModel):
     text: str
     backend: Optional[str] = None
     options: Optional[Dict[str, Any]] = None
+
+
+class KeyboardTypeRequest(BaseModel):
+    """Request body for the /keyboard/type endpoint."""
+
+    text: str
 
 
 # =============================================================================
@@ -376,6 +384,50 @@ async def integrations_send(request: IntegrationSendRequest) -> Dict[str, Any]:
         "response": result.get("response", ""),
         "backend": result.get("backend", ""),
     }
+
+
+# =============================================================================
+# Keyboard Emulation Endpoints
+# =============================================================================
+
+_keyboard_emulator: Optional[KeyboardEmulator] = None
+
+
+def _get_keyboard() -> KeyboardEmulator:
+    """Lazy-init singleton for keyboard emulator."""
+    global _keyboard_emulator
+    if _keyboard_emulator is None:
+        _keyboard_emulator = KeyboardEmulator()
+    return _keyboard_emulator
+
+
+@app.get("/keyboard/status")
+async def keyboard_status() -> Dict[str, Any]:
+    """Return keyboard emulation availability and detected tool."""
+    kb = _get_keyboard()
+    return {"available": kb.available, "tool": kb.tool}
+
+
+@app.post("/keyboard/type")
+async def keyboard_type(request: KeyboardTypeRequest) -> Dict[str, Any]:
+    """Type text at the current cursor position using system keyboard emulation."""
+    kb = _get_keyboard()
+    if not kb.available:
+        return JSONResponse(
+            status_code=503,
+            content={"error": "No keyboard emulation tool available", "tool": "none"},
+        )
+
+    loop = asyncio.get_event_loop()
+    success = await loop.run_in_executor(None, kb.type_text, request.text)
+
+    if success:
+        return {"success": True, "tool": kb.tool, "length": len(request.text)}
+    else:
+        return JSONResponse(
+            status_code=500,
+            content={"error": "Keyboard typing failed", "tool": kb.tool},
+        )
 
 
 # =============================================================================

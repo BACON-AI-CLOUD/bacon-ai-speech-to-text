@@ -226,6 +226,18 @@ export function SettingsPanel({ settings, onUpdate, onReset, onExport, onImport 
             </label>
           </div>
 
+          {/* Type to keyboard toggle */}
+          <div className="settings-group settings-group--inline">
+            <label className="settings-label settings-label--toggle">
+              <input
+                type="checkbox"
+                checked={settings.typeToKeyboard}
+                onChange={(e) => onUpdate({ typeToKeyboard: e.target.checked })}
+              />
+              Type to keyboard
+            </label>
+          </div>
+
           {/* Notifications toggle */}
           <div className="settings-group settings-group--inline">
             <label className="settings-label settings-label--toggle">

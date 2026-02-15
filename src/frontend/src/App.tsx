@@ -210,6 +210,8 @@ function App() {
           lastResult={lastResult}
           notificationsEnabled={settings.notificationsEnabled}
           autoCopy={settings.autoCopy}
+          typeToKeyboard={settings.typeToKeyboard}
+          backendUrl={settings.backendUrl}
         />
 
         <SettingsPanel

@@ -6,6 +6,8 @@ interface TranscriptionDisplayProps {
   lastResult: TranscriptionResult | null;
   notificationsEnabled?: boolean;
   autoCopy?: boolean;
+  typeToKeyboard?: boolean;
+  backendUrl?: string;
 }
 
 function formatTimestamp(ts: number): string {
@@ -23,6 +25,8 @@ export function TranscriptionDisplay({
   lastResult,
   notificationsEnabled = false,
   autoCopy = false,
+  typeToKeyboard = false,
+  backendUrl = 'ws://localhost:8765',
 }: TranscriptionDisplayProps) {
   const [history, setHistory] = useState<TranscriptionResult[]>([]);
   const [editText, setEditText] = useState('');
@@ -53,6 +57,20 @@ export function TranscriptionDisplay({
         });
       }
 
+      // Type to keyboard via backend emulation
+      if (typeToKeyboard) {
+        const httpUrl = backendUrl
+          .replace('ws://', 'http://')
+          .replace('wss://', 'https://');
+        fetch(`${httpUrl}/keyboard/type`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: lastResult.text }),
+        }).catch(() => {
+          // Keyboard typing is best-effort
+        });
+      }
+
       // Browser notification
       if (notificationsEnabled && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
         new Notification('BACON-AI Voice', {
@@ -61,7 +79,7 @@ export function TranscriptionDisplay({
         });
       }
     }
-  }, [lastResult, autoCopy, notificationsEnabled]);
+  }, [lastResult, autoCopy, notificationsEnabled, typeToKeyboard, backendUrl]);
 
   const handleCopy = async () => {
     try {
