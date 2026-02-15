@@ -13,7 +13,6 @@ Endpoints:
     POST /chat                - Send message to Claude API (FEAT-006)
     GET  /integrations        - List available integration backends
     POST /integrations/send   - Send text to selected backend
-    POST /recording/toggle    - Toggle recording on all connected WS clients
     WS   /ws/audio            - WebSocket for real-time audio streaming
 """
 
@@ -76,6 +75,8 @@ class KeyboardTypeRequest(BaseModel):
     """Request body for the /keyboard/type endpoint."""
 
     text: str
+    auto_focus: bool = False
+    target_window: str = ""
 
 
 # =============================================================================
@@ -390,6 +391,10 @@ async def integrations_send(request: IntegrationSendRequest) -> Dict[str, Any]:
 # Keyboard Emulation Endpoints
 # =============================================================================
 
+# =============================================================================
+# WebSocket Client Tracking (for global hotkey broadcast)
+# =============================================================================
+
 _keyboard_emulator: Optional[KeyboardEmulator] = None
 
 
@@ -408,6 +413,15 @@ async def keyboard_status() -> Dict[str, Any]:
     return {"available": kb.available, "tool": kb.tool}
 
 
+@app.get("/windows")
+async def list_windows() -> Dict[str, Any]:
+    """Return a list of visible desktop windows for target window selection."""
+    kb = _get_keyboard()
+    loop = asyncio.get_event_loop()
+    windows = await loop.run_in_executor(None, kb.list_windows)
+    return {"windows": windows}
+
+
 @app.post("/keyboard/type")
 async def keyboard_type(request: KeyboardTypeRequest) -> Dict[str, Any]:
     """Type text at the current cursor position using system keyboard emulation."""
@@ -419,10 +433,21 @@ async def keyboard_type(request: KeyboardTypeRequest) -> Dict[str, Any]:
         )
 
     loop = asyncio.get_event_loop()
+
+    # Focus target window or previous window before typing
+    if request.target_window:
+        focused = await loop.run_in_executor(None, kb.focus_window_by_title, request.target_window)
+        if focused:
+            await asyncio.sleep(0.3)
+    elif request.auto_focus:
+        focused = await loop.run_in_executor(None, kb.focus_previous_window)
+        if focused:
+            await asyncio.sleep(0.3)
+
     success = await loop.run_in_executor(None, kb.type_text, request.text)
 
     if success:
-        return {"success": True, "tool": kb.tool, "length": len(request.text)}
+        return {"success": True, "tool": kb.tool, "length": len(request.text), "auto_focused": request.auto_focus}
     else:
         return JSONResponse(
             status_code=500,

@@ -29,7 +29,9 @@ describe('TranscriptionDisplay', () => {
 
     expect(screen.getByText(/latest transcription/i)).toBeInTheDocument();
     expect(screen.getByDisplayValue('Test speech to text')).toBeInTheDocument();
-    expect(screen.getByText('88%')).toBeInTheDocument();
+    // Badge appears in both latest section and history
+    const badges = screen.getAllByText('88%');
+    expect(badges.length).toBeGreaterThanOrEqual(1);
   });
 
   it('allows editing the transcription text', () => {

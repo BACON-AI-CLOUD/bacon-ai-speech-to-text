@@ -9,6 +9,8 @@ interface SettingsPanelProps {
   onReset: () => void;
   onExport?: () => void;
   onImport?: (file: File) => Promise<boolean>;
+  isOpen: boolean;
+  onClose: () => void;
 }
 
 const MODELS = [
@@ -83,8 +85,90 @@ function KeyCaptureButton({
   );
 }
 
-export function SettingsPanel({ settings, onUpdate, onReset, onExport, onImport }: SettingsPanelProps) {
-  const [isOpen, setIsOpen] = useState(false);
+function TargetWindowSelector({
+  backendUrl,
+  targetWindow,
+  onUpdate,
+}: {
+  backendUrl: string;
+  targetWindow: string;
+  onUpdate: (val: string) => void;
+}) {
+  const [windows, setWindows] = useState<{ title: string; process: string }[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const fetchWindows = useCallback(async () => {
+    setLoading(true);
+    try {
+      const httpUrl = backendUrl
+        .replace('ws://', 'http://')
+        .replace('wss://', 'https://');
+      const res = await fetch(`${httpUrl}/windows`);
+      if (res.ok) {
+        const data = await res.json();
+        setWindows(data.windows || []);
+      }
+    } catch {
+      // Backend not reachable
+    }
+    setLoading(false);
+  }, [backendUrl]);
+
+  useEffect(() => {
+    fetchWindows();
+  }, [fetchWindows]);
+
+  return (
+    <div className="settings-group settings-group--indent">
+      <label className="settings-label">Target Window</label>
+      <div className="target-window-row">
+        <select
+          className="settings-select"
+          value={windows.some((w) => w.title === targetWindow) ? targetWindow : '__custom__'}
+          onChange={(e) => {
+            if (e.target.value === '__none__') {
+              onUpdate('');
+            } else if (e.target.value !== '__custom__') {
+              onUpdate(e.target.value);
+            }
+          }}
+        >
+          <option value="__none__">Last active window (Alt+Tab)</option>
+          {windows.map((w) => (
+            <option key={w.title} value={w.title}>
+              {w.title.length > 60 ? w.title.slice(0, 57) + '...' : w.title}
+            </option>
+          ))}
+          {targetWindow && !windows.some((w) => w.title === targetWindow) && (
+            <option value="__custom__">Custom: {targetWindow}</option>
+          )}
+        </select>
+        <button
+          className="btn-icon"
+          onClick={fetchWindows}
+          title="Refresh window list"
+          type="button"
+          disabled={loading}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <polyline points="23 4 23 10 17 10" />
+            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+          </svg>
+        </button>
+      </div>
+      <input
+        className="settings-input"
+        type="text"
+        value={targetWindow}
+        onChange={(e) => onUpdate(e.target.value)}
+        placeholder="Or type partial title (empty = Alt+Tab)"
+      />
+      <span className="settings-hint">Select a window or type a partial title match. Empty uses Alt+Tab to last active window.</span>
+    </div>
+  );
+}
+
+export function SettingsPanel({ settings, onUpdate, onReset, onExport, onImport, isOpen, onClose }: SettingsPanelProps) {
   const [importStatus, setImportStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -97,7 +181,6 @@ export function SettingsPanel({ settings, onUpdate, onReset, onExport, onImport 
       setImportStatus(success ? 'success' : 'error');
       setTimeout(() => setImportStatus('idle'), 3000);
 
-      // Reset file input so the same file can be selected again
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
@@ -105,18 +188,19 @@ export function SettingsPanel({ settings, onUpdate, onReset, onExport, onImport 
     [onImport],
   );
 
-  return (
-    <div className="settings-panel">
-      <button
-        className="settings-panel__toggle"
-        onClick={() => setIsOpen((prev) => !prev)}
-        aria-expanded={isOpen}
-      >
-        <span className="settings-panel__icon">{isOpen ? '\u25BC' : '\u25B6'}</span>
-        Settings
-      </button>
+  if (!isOpen) return null;
 
-      {isOpen && (
+  return (
+    <>
+      <div className="settings-overlay" onClick={onClose} />
+      <div className="settings-panel">
+        <div className="settings-panel__header">
+          <h2 className="settings-panel__title">Settings</h2>
+          <button className="settings-panel__close" onClick={onClose} title="Close settings">
+            &times;
+          </button>
+        </div>
+
         <div className="settings-panel__content">
           {/* Activation Mode */}
           <div className="settings-group">
@@ -214,6 +298,63 @@ export function SettingsPanel({ settings, onUpdate, onReset, onExport, onImport 
             />
           </div>
 
+          {/* Countdown Beeps */}
+          <div className="settings-group">
+            <label className="settings-label">
+              Countdown Beeps: {settings.countdownBeeps}
+            </label>
+            <input
+              className="settings-range"
+              type="range"
+              min="0"
+              max="5"
+              step="1"
+              value={settings.countdownBeeps}
+              onChange={(e) =>
+                onUpdate({ countdownBeeps: parseInt(e.target.value, 10) })
+              }
+            />
+            <span className="settings-hint">0 = no countdown, mic activates immediately</span>
+          </div>
+
+          {/* Countdown Interval */}
+          {settings.countdownBeeps > 0 && (
+            <div className="settings-group">
+              <label className="settings-label">
+                Beep Interval: {settings.countdownIntervalMs}ms
+              </label>
+              <input
+                className="settings-range"
+                type="range"
+                min="300"
+                max="1500"
+                step="100"
+                value={settings.countdownIntervalMs}
+                onChange={(e) =>
+                  onUpdate({ countdownIntervalMs: parseInt(e.target.value, 10) })
+                }
+              />
+            </div>
+          )}
+
+          {/* Beep Volume */}
+          <div className="settings-group">
+            <label className="settings-label">
+              Beep Volume: {Math.round(settings.beepVolume * 100)}%
+            </label>
+            <input
+              className="settings-range"
+              type="range"
+              min="0.05"
+              max="1.0"
+              step="0.05"
+              value={settings.beepVolume}
+              onChange={(e) =>
+                onUpdate({ beepVolume: parseFloat(e.target.value) })
+              }
+            />
+          </div>
+
           {/* Auto-copy toggle */}
           <div className="settings-group settings-group--inline">
             <label className="settings-label settings-label--toggle">
@@ -238,6 +379,30 @@ export function SettingsPanel({ settings, onUpdate, onReset, onExport, onImport 
             </label>
           </div>
 
+          {/* Auto-focus previous window (only when type-to-keyboard is on) */}
+          {settings.typeToKeyboard && (
+            <div className="settings-group settings-group--inline settings-group--indent">
+              <label className="settings-label settings-label--toggle">
+                <input
+                  type="checkbox"
+                  checked={settings.typingAutoFocus}
+                  onChange={(e) => onUpdate({ typingAutoFocus: e.target.checked })}
+                />
+                Auto-focus previous window
+              </label>
+              <span className="settings-hint">Switches to the previous app (Alt+Tab) before typing</span>
+            </div>
+          )}
+
+          {/* Target Window (only when type-to-keyboard is on) */}
+          {settings.typeToKeyboard && (
+            <TargetWindowSelector
+              backendUrl={settings.backendUrl}
+              targetWindow={settings.targetWindow}
+              onUpdate={(val) => onUpdate({ targetWindow: val })}
+            />
+          )}
+
           {/* Notifications toggle */}
           <div className="settings-group settings-group--inline">
             <label className="settings-label settings-label--toggle">
@@ -248,24 +413,6 @@ export function SettingsPanel({ settings, onUpdate, onReset, onExport, onImport 
               />
               Browser notifications
             </label>
-          </div>
-
-          {/* Global Hotkey */}
-          <div className="settings-group">
-            <label className="settings-label">Global Hotkey</label>
-            <div className="key-capture">
-              <input
-                className="settings-input"
-                type="text"
-                value={settings.globalHotkey}
-                onChange={(e) => onUpdate({ globalHotkey: e.target.value })}
-                placeholder="F2"
-                style={{ width: '80px' }}
-              />
-            </div>
-            <span className="settings-hint">
-              Run <code>scripts/global-hotkey.ps1</code> (Windows) or <code>scripts/global-hotkey.sh</code> (Linux) to enable system-wide toggle.
-            </span>
           </div>
 
           {/* Action Buttons */}
@@ -308,7 +455,7 @@ export function SettingsPanel({ settings, onUpdate, onReset, onExport, onImport 
             </div>
           )}
         </div>
-      )}
-    </div>
+      </div>
+    </>
   );
 }

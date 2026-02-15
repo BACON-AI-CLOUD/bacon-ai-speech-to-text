@@ -95,7 +95,9 @@ export function useWebSocket({
                 }
                 break;
               case 'control':
+                console.log('[BACON] Control message received:', message);
                 if ((message as Record<string, unknown>).action === 'toggle') {
+                  console.log('[BACON] Calling onRemoteToggle, ref exists:', !!onRemoteToggleRef.current);
                   onRemoteToggleRef.current?.();
                 }
                 break;

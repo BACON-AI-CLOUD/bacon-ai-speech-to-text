@@ -45,7 +45,15 @@ export interface AppSettings {
   notificationsEnabled: boolean;
   autoCopy: boolean;
   typeToKeyboard: boolean;
-  globalHotkey: string;
+  typingAutoFocus: boolean;
+  countdownBeeps: number;         // Number of countdown beeps (0 = no countdown)
+  countdownIntervalMs: number;    // Delay between beeps in ms
+  beepFreqStart: number;          // First beep frequency (Hz)
+  beepFreqEnd: number;            // Last beep frequency (Hz)
+  beepDuration: number;           // Each beep duration in seconds
+  beepVolume: number;             // Beep volume 0.0 - 1.0
+  micOffBeepFreq: number;         // Mic-off beep frequency (Hz)
+  targetWindow: string;           // Fixed window title to focus for typing (empty = Alt+Tab)
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -59,7 +67,15 @@ export const DEFAULT_SETTINGS: AppSettings = {
   notificationsEnabled: false,
   autoCopy: false,
   typeToKeyboard: false,
-  globalHotkey: 'F2',
+  typingAutoFocus: true,
+  countdownBeeps: 3,
+  countdownIntervalMs: 700,
+  beepFreqStart: 520,
+  beepFreqEnd: 780,
+  beepDuration: 0.18,
+  beepVolume: 0.4,
+  micOffBeepFreq: 440,
+  targetWindow: '',
 };
 
 export type ErrorCategory = 'connection' | 'permission' | 'transcription' | 'unknown';

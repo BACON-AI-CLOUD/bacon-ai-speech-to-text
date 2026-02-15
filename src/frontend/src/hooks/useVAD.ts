@@ -9,6 +9,8 @@ interface UseVADOptions {
   silenceTimeout: number;
   /** Whether VAD monitoring is enabled */
   enabled: boolean;
+  /** Start in speaking state (skip onset detection, immediately monitor for silence) */
+  assumeSpeaking?: boolean;
   /** Called when speech onset is detected */
   onSpeechStart: () => void;
   /** Called when silence is detected after speech */
@@ -27,6 +29,7 @@ export function useVAD({
   vadThreshold,
   silenceTimeout,
   enabled,
+  assumeSpeaking = false,
   onSpeechStart,
   onSpeechEnd,
 }: UseVADOptions): UseVADReturn {
@@ -77,6 +80,7 @@ export function useVAD({
   }, []);
 
   useEffect(() => {
+    console.log('[VAD] Effect run: enabled=', enabled, 'audioStream=', !!audioStream, 'assumeSpeaking=', assumeSpeaking);
     if (!enabled || !audioStream) {
       cleanup();
       return;
@@ -94,6 +98,13 @@ export function useVAD({
     const source = audioContext.createMediaStreamSource(audioStream);
     source.connect(analyser);
     sourceRef.current = source;
+
+    // If assumeSpeaking, start in speaking state to immediately monitor for silence
+    if (assumeSpeaking) {
+      console.log('[VAD] Starting in speaking state (assumeSpeaking=true)');
+      isSpeakingRef.current = true;
+      setIsSpeaking(true);
+    }
 
     const dataArray = new Float32Array(analyser.fftSize);
     const SPEECH_ONSET_MS = 100; // Speech must persist for 100ms to trigger start
@@ -140,6 +151,7 @@ export function useVAD({
             silenceStartTimeRef.current = now;
           } else if (now - silenceStartTimeRef.current >= silTimeout) {
             // Silence persisted long enough - trigger stop
+            console.log('[VAD] Silence detected, stopping. RMS:', rms, 'threshold:', threshold);
             isSpeakingRef.current = false;
             setIsSpeaking(false);
             onSpeechEndRef.current();
@@ -153,7 +165,7 @@ export function useVAD({
     animFrameRef.current = requestAnimationFrame(monitorAudio);
 
     return cleanup;
-  }, [enabled, audioStream, cleanup]);
+  }, [enabled, audioStream, assumeSpeaking, cleanup]);
 
   return {
     audioLevel,

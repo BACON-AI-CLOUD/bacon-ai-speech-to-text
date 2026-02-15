@@ -17,6 +17,8 @@ describe('SettingsPanel', () => {
     settings: DEFAULT_SETTINGS,
     onUpdate: vi.fn(),
     onReset: vi.fn(),
+    isOpen: true,
+    onClose: vi.fn(),
   };
 
   beforeEach(() => {
@@ -30,9 +32,6 @@ describe('SettingsPanel', () => {
     render(
       <SettingsPanel {...defaultProps} settings={settings} />,
     );
-
-    // Open settings panel
-    fireEvent.click(screen.getByText('Settings'));
 
     // Find key capture button showing "Space"
     const captureBtn = screen.getByText('Space');
@@ -48,7 +47,6 @@ describe('SettingsPanel', () => {
       <SettingsPanel {...defaultProps} settings={settings} onUpdate={onUpdate} />,
     );
 
-    fireEvent.click(screen.getByText('Settings'));
     fireEvent.click(screen.getByText('Space'));
 
     // Now press a key on window
@@ -64,7 +62,6 @@ describe('SettingsPanel', () => {
       <SettingsPanel {...defaultProps} settings={settings} onUpdate={onUpdate} />,
     );
 
-    fireEvent.click(screen.getByText('Settings'));
     fireEvent.click(screen.getByText('Space'));
 
     expect(screen.getByText('Press a key...')).toBeInTheDocument();
@@ -85,7 +82,6 @@ describe('SettingsPanel', () => {
       <SettingsPanel {...defaultProps} onExport={onExport} />,
     );
 
-    fireEvent.click(screen.getByText('Settings'));
     fireEvent.click(screen.getByText('Export Settings'));
 
     expect(onExport).toHaveBeenCalledTimes(1);
@@ -96,8 +92,6 @@ describe('SettingsPanel', () => {
     render(
       <SettingsPanel {...defaultProps} onImport={onImport} />,
     );
-
-    fireEvent.click(screen.getByText('Settings'));
 
     // Find the hidden file input and simulate file selection
     const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
@@ -121,8 +115,6 @@ describe('SettingsPanel', () => {
       <SettingsPanel {...defaultProps} onImport={onImport} />,
     );
 
-    fireEvent.click(screen.getByText('Settings'));
-
     const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
     const file = new File(
       ['not valid json'],
@@ -138,5 +130,12 @@ describe('SettingsPanel', () => {
         screen.getByText('Failed to import settings. Invalid file format.'),
       ).toBeInTheDocument();
     });
+  });
+
+  it('returns null when isOpen is false', () => {
+    const { container } = render(
+      <SettingsPanel {...defaultProps} isOpen={false} />,
+    );
+    expect(container.innerHTML).toBe('');
   });
 });

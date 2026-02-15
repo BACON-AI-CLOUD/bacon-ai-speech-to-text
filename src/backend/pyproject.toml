@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "bacon-ai-voice-backend"
+name = "bacon-ai-voice-v1-backend"
 version = "0.1.0"
 description = "BACON-AI Voice Backend - FastAPI STT service with Faster-Whisper"
 requires-python = ">=3.10"
