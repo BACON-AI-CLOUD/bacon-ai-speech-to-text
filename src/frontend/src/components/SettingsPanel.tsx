@@ -250,6 +250,24 @@ export function SettingsPanel({ settings, onUpdate, onReset, onExport, onImport 
             </label>
           </div>
 
+          {/* Global Hotkey */}
+          <div className="settings-group">
+            <label className="settings-label">Global Hotkey</label>
+            <div className="key-capture">
+              <input
+                className="settings-input"
+                type="text"
+                value={settings.globalHotkey}
+                onChange={(e) => onUpdate({ globalHotkey: e.target.value })}
+                placeholder="F2"
+                style={{ width: '80px' }}
+              />
+            </div>
+            <span className="settings-hint">
+              Run <code>scripts/global-hotkey.ps1</code> (Windows) or <code>scripts/global-hotkey.sh</code> (Linux) to enable system-wide toggle.
+            </span>
+          </div>
+
           {/* Action Buttons */}
           <div className="settings-actions">
             {onExport && (

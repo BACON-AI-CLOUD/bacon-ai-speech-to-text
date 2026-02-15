@@ -9,6 +9,7 @@ import type {
 interface UseWebSocketOptions {
   url: string;
   autoConnect?: boolean;
+  onRemoteToggle?: () => void;
 }
 
 interface UseWebSocketReturn {
@@ -29,7 +30,10 @@ const BASE_RECONNECT_DELAY = 1000;
 export function useWebSocket({
   url,
   autoConnect = true,
+  onRemoteToggle,
 }: UseWebSocketOptions): UseWebSocketReturn {
+  const onRemoteToggleRef = useRef(onRemoteToggle);
+  onRemoteToggleRef.current = onRemoteToggle;
   const [connectionState, setConnectionState] =
     useState<ConnectionState>('disconnected');
   const [lastResult, setLastResult] = useState<TranscriptionResult | null>(
@@ -88,6 +92,11 @@ export function useWebSocket({
                 // not state-change messages like {type:"status", state:"ready"}
                 if ('current_model' in message || 'gpu' in message) {
                   setServerStatus(message as unknown as ServerStatus);
+                }
+                break;
+              case 'control':
+                if ((message as Record<string, unknown>).action === 'toggle') {
+                  onRemoteToggleRef.current?.();
                 }
                 break;
               case 'error':

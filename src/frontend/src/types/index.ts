@@ -45,6 +45,7 @@ export interface AppSettings {
   notificationsEnabled: boolean;
   autoCopy: boolean;
   typeToKeyboard: boolean;
+  globalHotkey: string;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -58,6 +59,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   notificationsEnabled: false,
   autoCopy: false,
   typeToKeyboard: false,
+  globalHotkey: 'F2',
 };
 
 export type ErrorCategory = 'connection' | 'permission' | 'transcription' | 'unknown';

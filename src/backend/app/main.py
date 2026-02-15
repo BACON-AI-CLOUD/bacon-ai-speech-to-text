@@ -431,6 +431,38 @@ async def keyboard_type(request: KeyboardTypeRequest) -> Dict[str, Any]:
 
 
 # =============================================================================
+# Connected WebSocket Clients (for remote toggle)
+# =============================================================================
+
+_connected_clients: List[WebSocket] = []
+
+
+@app.post("/recording/toggle")
+async def recording_toggle() -> Dict[str, Any]:
+    """
+    Toggle recording on all connected WebSocket clients.
+
+    Broadcasts a control message to every connected client, which triggers
+    start/stop recording in the frontend. Used by the global hotkey helper script.
+    """
+    sent = 0
+    failed = []
+    for ws in list(_connected_clients):
+        try:
+            await ws.send_json({"type": "control", "action": "toggle"})
+            sent += 1
+        except Exception:
+            failed.append(ws)
+
+    # Clean up dead connections
+    for ws in failed:
+        if ws in _connected_clients:
+            _connected_clients.remove(ws)
+
+    return {"toggled": True, "clients": sent}
+
+
+# =============================================================================
 # WebSocket Endpoint
 # =============================================================================
 
@@ -451,6 +483,7 @@ async def websocket_audio(websocket: WebSocket):
             - {"type": "error", "message": "..."}
     """
     await websocket.accept()
+    _connected_clients.append(websocket)
     engine = get_engine()
 
     audio_chunks: List[bytes] = []
@@ -553,6 +586,9 @@ async def websocket_audio(websocket: WebSocket):
             await send_error(str(e))
         except Exception:
             pass
+    finally:
+        if websocket in _connected_clients:
+            _connected_clients.remove(websocket)
 
 
 # =============================================================================

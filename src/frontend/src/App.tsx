@@ -29,7 +29,11 @@ function App() {
   } = useWebSocket({
     url: settings.backendUrl,
     autoConnect: true,
+    onRemoteToggle: () => handleToggleRef.current(),
   });
+
+  // Ref to avoid circular dependency between useWebSocket and handleToggle
+  const handleToggleRef = useRef<() => void>(() => {});
 
   // Model download progress state
   const [modelProgress, setModelProgress] = useState<ModelDownloadProgress | null>(null);
@@ -172,6 +176,11 @@ function App() {
       triggerStart();
     }
   }, [recordingState, triggerStart, triggerStop]);
+
+  // Keep handleToggleRef in sync for remote toggle
+  useEffect(() => {
+    handleToggleRef.current = handleToggle;
+  }, [handleToggle]);
 
   // Retry handler for error display
   const handleRetry = useCallback(() => {
