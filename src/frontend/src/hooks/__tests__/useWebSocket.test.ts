@@ -130,11 +130,11 @@ describe('useWebSocket', () => {
 
     act(() => {
       MockWebSocket.instances[0].simulateMessage(
-        JSON.stringify({ type: 'result', payload: testResult }),
+        JSON.stringify({ type: 'result', ...testResult }),
       );
     });
 
-    expect(result.current.lastResult).toEqual(testResult);
+    expect(result.current.lastResult).toMatchObject(testResult);
   });
 
   it('parses error messages from server', () => {
@@ -150,7 +150,7 @@ describe('useWebSocket', () => {
       MockWebSocket.instances[0].simulateMessage(
         JSON.stringify({
           type: 'error',
-          payload: { message: 'Model not found' },
+          message: 'Model not found',
         }),
       );
     });
@@ -216,8 +216,6 @@ describe('useWebSocket', () => {
 
     const lastSent = MockWebSocket.instances[0].sent[0] as string;
     const parsed = JSON.parse(lastSent);
-    expect(parsed.type).toBe('control');
-    expect(parsed.payload.action).toBe('start');
-    expect(parsed.payload.model).toBe('base');
+    expect(parsed.type).toBe('start');
   });
 });

@@ -36,7 +36,7 @@ function App() {
   const modelPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Poll for model download progress when model changes
-  const prevModelRef = useRef(settings.selectedModel);
+  const prevModelRef = useRef('');
   useEffect(() => {
     if (settings.selectedModel !== prevModelRef.current) {
       prevModelRef.current = settings.selectedModel;
@@ -46,10 +46,13 @@ function App() {
         downloading: true,
       });
 
-      // Poll the REST endpoint
+      // Trigger the actual model load on the backend, then poll for progress
       const backendHttp = settings.backendUrl
         .replace('ws://', 'http://')
         .replace('wss://', 'https://');
+
+      fetch(`${backendHttp}/models/${settings.selectedModel}/load`, { method: 'POST' })
+        .catch(() => { /* polling below handles progress */ });
 
       let attempts = 0;
       modelPollRef.current = setInterval(async () => {

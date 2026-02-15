@@ -43,7 +43,7 @@ export function StatusBar({ connectionState, serverStatus, reconnectAttempt = 0 
           <div className="status-bar__divider" />
           <div className="status-bar__gpu">
             GPU:{' '}
-            {serverStatus.gpu.available ? (
+            {serverStatus.gpu?.available ? (
               <span className="status-bar__gpu--available">
                 {serverStatus.gpu.name} ({serverStatus.gpu.vram_gb}GB)
               </span>

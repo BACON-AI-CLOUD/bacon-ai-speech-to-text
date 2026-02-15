@@ -77,21 +77,22 @@ export function useWebSocket({
       ws.onmessage = (event: MessageEvent) => {
         try {
           if (typeof event.data === 'string') {
-            const message = JSON.parse(event.data) as {
-              type: string;
-              payload: unknown;
-            };
+            // Backend sends flat messages: { type, ...data } (no payload wrapper)
+            const message = JSON.parse(event.data) as Record<string, unknown>;
             switch (message.type) {
               case 'result':
-                setLastResult(message.payload as TranscriptionResult);
+                setLastResult(message as unknown as TranscriptionResult);
                 break;
               case 'status':
-                setServerStatus(message.payload as ServerStatus);
+                // Only update serverStatus for full status messages (with gpu info),
+                // not state-change messages like {type:"status", state:"ready"}
+                if ('current_model' in message || 'gpu' in message) {
+                  setServerStatus(message as unknown as ServerStatus);
+                }
                 break;
               case 'error':
                 setLastError(
-                  (message.payload as { message: string }).message ||
-                    'Unknown server error',
+                  (message.message as string) || 'Unknown server error',
                 );
                 break;
             }
@@ -102,6 +103,11 @@ export function useWebSocket({
       };
 
       ws.onclose = () => {
+        // Ignore close events from superseded WebSocket instances
+        // (prevents StrictMode double-mount race condition where
+        // old WS onclose clobbers wsRef pointing to new WS)
+        if (wsRef.current !== ws) return;
+
         wsRef.current = null;
         if (!intentionalCloseRef.current) {
           setConnectionState('disconnected');
@@ -122,6 +128,8 @@ export function useWebSocket({
       };
 
       ws.onerror = () => {
+        // Ignore errors from superseded WebSocket instances
+        if (wsRef.current !== ws) return;
         setConnectionState('error');
         setLastError('WebSocket connection error');
       };
@@ -153,8 +161,9 @@ export function useWebSocket({
 
   const sendControl = useCallback((message: ControlMessage) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
+      // Backend expects flat: { type: 'start' }, { type: 'stop' }, { type: 'cancel' }
       wsRef.current.send(
-        JSON.stringify({ type: 'control', payload: message }),
+        JSON.stringify({ type: message.action }),
       );
     }
   }, []);
