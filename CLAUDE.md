@@ -18,14 +18,14 @@
 
 | Field | Value |
 |-------|-------|
-| **Current Phase** | 9: TDD Build (Phase A - Foundation) |
-| **Phase Status** | in-progress |
-| **Active Features** | FEAT-001 (STT Backend), FEAT-002 (React UI) |
-| **Active Branch** | feature/FEAT-001-stt-backend, feature/FEAT-002-react-ui |
-| **Last Action** | Phase 0 complete, gap analysis done, parallel sub-agents spawned for Phase A |
-| **Next Step** | Verify sub-agent outputs, run integration tests, gate Phase A |
+| **Current Phase** | v1.1 AI Text Refinement - Design Complete, Pre-Implementation |
+| **Phase Status** | design-complete |
+| **Active Features** | v1.1 Text Refinement (REQ-101 to REQ-117) |
+| **Active Branch** | feature/v1.1-text-refinement |
+| **Last Action** | Gap analysis complete, PRD/ADD/CLAUDE.md conflicts resolved |
+| **Next Step** | Human checkpoint (Pre-Implementation), then delegate coding to sub-agents |
 | **Blockers** | None |
-| **Last Updated** | 2026-02-11 by orchestrator |
+| **Last Updated** | 2026-02-16 by orchestrator |
 
 ## YOUR ROLE: ORCHESTRATOR
 
@@ -118,28 +118,69 @@ User-selectable: tiny, base, small, medium, large-v3
 
 ## FEATURE TRACKING
 
+### v1.0 Features (ALL COMPLETE - merged to main 2026-02-15)
+
 | Feature ID | Title | Phase | Branch | Status | Evidence |
 |-----------|-------|-------|--------|--------|----------|
-| FEAT-001 | Core STT Backend (FastAPI + Whisper) | TBD | TBD | planned | - |
-| FEAT-002 | React Web UI (mic capture, waveform, controls) | TBD | TBD | planned | - |
-| FEAT-003 | Push-to-talk activation mode | TBD | TBD | planned | - |
-| FEAT-004 | Voice activation mode (VAD) | TBD | TBD | planned | - |
-| FEAT-005 | Toggle button activation mode | TBD | TBD | planned | - |
-| FEAT-006 | Claude API direct integration | TBD | TBD | planned | - |
-| FEAT-007 | WebSocket bridge to Claude Code | TBD | TBD | planned | - |
-| FEAT-008 | MCP Server integration | TBD | TBD | planned | - |
-| FEAT-009 | Whisper model selector (configurable) | TBD | TBD | planned | - |
-| FEAT-010 | Cross-platform audio handling | TBD | TBD | planned | - |
-| FEAT-011 | Model download with progress UI | TBD | TBD | planned | - |
-| FEAT-012 | Settings persistence (localStorage + config.json) | TBD | TBD | planned | - |
-| FEAT-013 | Error handling UX (all error states) | TBD | TBD | planned | - |
-| FEAT-014 | Startup scripts (start.sh / start.bat) | TBD | TBD | planned | - |
+| FEAT-001 | Core STT Backend (FastAPI + Whisper) | Phase A | feature/FEAT-001-stt-backend | completed | 32 backend tests |
+| FEAT-002 | React Web UI (mic capture, waveform, controls) | Phase A | feature/FEAT-002-react-ui | completed | 22 frontend tests |
+| FEAT-003 | Push-to-talk activation mode | Phase B | feature/FEAT-003-005-activation-modes | completed | 21 frontend tests |
+| FEAT-004 | Voice activation mode (VAD) | Phase B | feature/FEAT-003-005-activation-modes | completed | Included in Phase B tests |
+| FEAT-005 | Toggle button activation mode | Phase B | feature/FEAT-003-005-activation-modes | completed | Included in Phase B tests |
+| FEAT-006 | Claude API direct integration | Phase C | feature/FEAT-006-008-integrations | completed | 20 backend tests |
+| FEAT-007 | WebSocket bridge to Claude Code | Phase C | feature/FEAT-006-008-integrations | completed | Included in Phase C tests |
+| FEAT-008 | MCP Server integration | Phase C | feature/FEAT-006-008-integrations | completed | Included in Phase C tests |
+| FEAT-009 | Whisper model selector (configurable) | Phase D | feature/FEAT-009-014-polish | completed | 15 frontend tests |
+| FEAT-010 | Cross-platform audio handling | Phase D | feature/FEAT-009-014-polish | completed | Included in Phase D tests |
+| FEAT-011 | Model download with progress UI | Phase D | feature/FEAT-009-014-polish | completed | Included in Phase D tests |
+| FEAT-012 | Settings persistence (localStorage + config.json) | Phase D | feature/FEAT-009-014-polish | completed | Included in Phase D tests |
+| FEAT-013 | Error handling UX (all error states) | Phase D | feature/FEAT-009-014-polish | completed | Included in Phase D tests |
+| FEAT-014 | Startup scripts (start.sh / start.bat) | Phase D | feature/FEAT-009-014-polish | completed | Included in Phase D tests |
+
+### Post-v1.0 Bug Fixes (on develop, merged to main 2026-02-16)
+
+| ID | Title | Status | Details |
+|----|-------|--------|---------|
+| FIX-001 | CORS blocking /windows endpoint | completed | Added /windows to CORS allowed origins |
+| FIX-002 | Silence timeout not auto-stopping in toggle mode | completed | Standalone silence monitor in App.tsx |
+| FIX-003 | WebSocket StrictMode race condition | completed | Fixed double-mount cleanup |
+| FIX-004 | StatusBar crash on undefined state | completed | Added null safety checks |
+
+### Post-v1.0 Enhancements (on develop)
+
+| ID | Title | Status | Details |
+|----|-------|--------|---------|
+| FEAT-015 | Auto-focus typing to target window | completed | Types transcription to specified window title |
+| FEAT-016 | Global hotkey (system-wide recording toggle) | planned | Plan exists, deferred to v1.2 |
+
+### v1.1 Features (IN PROGRESS - feature/v1.1-text-refinement)
+
+| Feature ID | Title | Priority | Status | PRD Ref |
+|-----------|-------|----------|--------|---------|
+| FEAT-101 | Refiner pipeline (raw text → AI cleanup → clean text) | P0 | planned | REQ-101 |
+| FEAT-102 | Groq provider (cloud, ~200ms) | P0 | planned | REQ-102 |
+| FEAT-103 | Ollama provider (local, free) | P0 | planned | REQ-103 |
+| FEAT-104 | Gemini provider (cloud) | P1 | planned | REQ-104 |
+| FEAT-105 | Refiner on/off toggle UI | P0 | planned | REQ-105 |
+| FEAT-106 | Provider selection + API key management | P0 | planned | REQ-106, REQ-107 |
+| FEAT-107 | Raw vs refined text comparison | P0 | planned | REQ-108 |
+| FEAT-108 | Customizable cleanup prompt | P1 | planned | REQ-109 |
+| FEAT-109 | Test refiner button | P1 | planned | REQ-110 |
+| FEAT-110 | Auto-refine after transcription | P0 | planned | REQ-111 |
+| FEAT-111 | Refined text for keyboard typing | P0 | planned | REQ-112 |
+| FEAT-112 | REST endpoints (process, config, test) | P0 | planned | REQ-113-115 |
+| FEAT-113 | Graceful fallback on provider error | P0 | planned | REQ-116 |
+| FEAT-114 | API key security (backend config.json) | P0 | planned | REQ-117 |
 
 ## LESSONS LEARNED (PROJECT-SPECIFIC)
 
 | # | Issue | Resolution | Prevention |
 |---|-------|------------|------------|
-| - | None yet | - | - |
+| 1 | pyproject.toml missing wheel packages config | Added `[tool.hatch.build.targets.wheel] packages = ["app"]` | Always verify build config on new Python projects |
+| 2 | Sub-agents shared CWD causing wrong-branch confusion | Explicit branch switch in agent prompts | Always specify branch in sub-agent context |
+| 3 | Git unrelated histories merge (55+ add/add conflicts) | Force push after extracting needed files from remote | Use force push for initial repo setup, not merge |
+| 4 | thebacons account denied push to BACON-AI-CLOUD | Use BACON-AI-CLOUD PAT from ~/.env | Always check which GitHub account has push access |
+| 5 | PRD vs ADD conflicts (API key storage, default provider) | Resolved during gap analysis, docs updated | Run gap analysis between PRD and ADD before coding |
 
 ## KEY DECISIONS
 
@@ -152,8 +193,12 @@ User-selectable: tiny, base, small, medium, large-v3
 | 5 | Reuse bacon-ai-voice-mcp Whisper engine | Proven, GPU-optimized, already tested | TBD | 2026-02-11 |
 | 6 | English only for v1.0 | Simplicity, can add multi-language later | - | 2026-02-11 |
 | 7 | WebM/Opus direct to Faster-Whisper | Avoids WAV conversion step, Whisper accepts WebM natively | - | 2026-02-11 |
-| 8 | @ricky0123/vad-web for browser VAD | WASM-based, high accuracy, React hooks available | - | 2026-02-11 |
+| 8 | AnalyserNode+RMS for browser VAD | Simpler than ONNX, no model dependency, sufficient accuracy | - | 2026-02-11 |
 | 9 | localStorage for frontend settings | Simple, no database, survives page refreshes | - | 2026-02-11 |
+| 10 | Git branching over separate directories | Single repo, incremental features, full diff/merge tooling | PLAN-VERSIONING-STRATEGY | 2026-02-16 |
+| 11 | API keys in backend config.json (not localStorage) | More secure, keys never touch browser | ADD-002 | 2026-02-16 |
+| 12 | Ollama as default refiner provider | Works without API key, best first-run UX | PRD-002 | 2026-02-16 |
+| 13 | Global hotkey deferred to v1.2 | v1.1 focused on text refinement, hotkey is separate concern | PLAN-VERSIONING-STRATEGY | 2026-02-16 |
 
 ## RECOVERY PROTOCOL (READ AFTER COMPACTION)
 

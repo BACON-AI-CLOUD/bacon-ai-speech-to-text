@@ -54,6 +54,7 @@ export interface AppSettings {
   beepVolume: number;             // Beep volume 0.0 - 1.0
   micOffBeepFreq: number;         // Mic-off beep frequency (Hz)
   targetWindow: string;           // Fixed window title to focus for typing (empty = Alt+Tab)
+  refiner: RefinerConfig;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -76,7 +77,29 @@ export const DEFAULT_SETTINGS: AppSettings = {
   beepVolume: 0.4,
   micOffBeepFreq: 440,
   targetWindow: '',
+  refiner: {
+    enabled: false,
+    provider: 'ollama',
+    customPrompt: '',
+  },
 };
+
+export interface RefinerConfig {
+  enabled: boolean;
+  provider: 'groq' | 'ollama' | 'gemini';
+  customPrompt: string;  // empty = use server default
+  // NOTE: API keys stored backend-side in config.json only
+}
+
+export interface RefinerResult {
+  raw_text: string;
+  refined_text: string;
+  provider: string;
+  model: string;
+  processing_time_ms: number;
+  tokens_used: number;
+  warning?: string;
+}
 
 export type ErrorCategory = 'connection' | 'permission' | 'transcription' | 'unknown';
 

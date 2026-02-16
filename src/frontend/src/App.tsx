@@ -12,7 +12,7 @@ import { SettingsPanel } from './components/SettingsPanel.tsx';
 import { ErrorDisplay } from './components/ErrorDisplay.tsx';
 import { ModelProgress } from './components/ModelProgress.tsx';
 import { playCountdownBeeps, playBeep, warmUpAudio } from './utils/beep.ts';
-import type { ModelDownloadProgress } from './types/index.ts';
+import type { ModelDownloadProgress, RefinerResult } from './types/index.ts';
 import './App.css';
 
 function App() {
@@ -36,6 +36,9 @@ function App() {
   const [remoteTriggered, setRemoteTriggered] = useState(false);
   const [countdown, setCountdown] = useState(0); // 3,2,1,0 - 0 = not counting
   const [miniMode, setMiniMode] = useState(false);
+  const [refinerResult, setRefinerResult] = useState<RefinerResult | null>(null);
+  const [isRefining, setIsRefining] = useState(false);
+  const [refinerError, setRefinerError] = useState<string | null>(null);
 
   const {
     connectionState,
@@ -292,6 +295,48 @@ function App() {
     }
   }, [lastResult, recordingState, setRecordingState]);
 
+  // Refiner: post-process transcription via LLM when enabled
+  const refinerResultRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!lastResult || !settings.refiner.enabled) {
+      return;
+    }
+    // Avoid re-refining the same text
+    if (refinerResultRef.current === lastResult.text) {
+      return;
+    }
+    refinerResultRef.current = lastResult.text;
+
+    setIsRefining(true);
+    setRefinerError(null);
+    setRefinerResult(null);
+
+    const backendHttp = settings.backendUrl
+      .replace('ws://', 'http://')
+      .replace('wss://', 'https://');
+
+    fetch(`${backendHttp}/refiner/process`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: lastResult.text }),
+    })
+      .then(async (res) => {
+        if (res.ok) {
+          const data: RefinerResult = await res.json();
+          setRefinerResult(data);
+        } else {
+          const errData = await res.json().catch(() => ({ detail: 'Refinement failed' }));
+          setRefinerError(errData.detail || 'Refinement failed');
+        }
+      })
+      .catch(() => {
+        setRefinerError('Could not reach refiner backend');
+      })
+      .finally(() => {
+        setIsRefining(false);
+      });
+  }, [lastResult, settings.refiner.enabled, settings.backendUrl]);
+
   // Transition processing -> idle when an error arrives
   useEffect(() => {
     if (lastError && recordingState === 'processing') {
@@ -491,6 +536,10 @@ function App() {
           typingAutoFocus={settings.typingAutoFocus}
           targetWindow={settings.targetWindow}
           backendUrl={settings.backendUrl}
+          refinerEnabled={settings.refiner.enabled}
+          refinerResult={refinerResult}
+          isRefining={isRefining}
+          refinerError={refinerError}
         />
 
         <SettingsPanel

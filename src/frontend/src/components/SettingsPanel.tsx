@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { AppSettings, ActivationMode } from '../types/index.ts';
 import { formatKeyName } from '../utils/keys.ts';
+import { RefinerSettings } from './RefinerSettings.tsx';
 import './SettingsPanel.css';
 
 interface SettingsPanelProps {
@@ -414,6 +415,13 @@ export function SettingsPanel({ settings, onUpdate, onReset, onExport, onImport,
               Browser notifications
             </label>
           </div>
+
+          {/* Text Refiner */}
+          <RefinerSettings
+            settings={settings}
+            onUpdate={onUpdate}
+            backendUrl={settings.backendUrl}
+          />
 
           {/* Action Buttons */}
           <div className="settings-actions">

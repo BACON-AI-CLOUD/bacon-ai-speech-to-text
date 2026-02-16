@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import type { TranscriptionResult } from '../types/index.ts';
+import type { TranscriptionResult, RefinerResult } from '../types/index.ts';
+import { TextComparison } from './TextComparison.tsx';
 import './TranscriptionDisplay.css';
 
 interface TranscriptionDisplayProps {
@@ -10,6 +11,10 @@ interface TranscriptionDisplayProps {
   typingAutoFocus?: boolean;
   targetWindow?: string;
   backendUrl?: string;
+  refinerEnabled?: boolean;
+  refinerResult?: RefinerResult | null;
+  isRefining?: boolean;
+  refinerError?: string | null;
 }
 
 function formatTimestamp(ts: number): string {
@@ -42,6 +47,10 @@ export function TranscriptionDisplay({
   typingAutoFocus = true,
   targetWindow = '',
   backendUrl = 'ws://localhost:8765',
+  refinerEnabled = false,
+  refinerResult = null,
+  isRefining = false,
+  refinerError = null,
 }: TranscriptionDisplayProps) {
   const [history, setHistory] = useState<TranscriptionResult[]>([]);
   const [editText, setEditText] = useState('');
@@ -160,12 +169,24 @@ export function TranscriptionDisplay({
             </span>
           </div>
 
-          <textarea
-            className="transcription-current__editor"
-            value={editText}
-            onChange={(e) => setEditText(e.target.value)}
-            rows={3}
-          />
+          {refinerEnabled ? (
+            <TextComparison
+              rawText={lastResult.text}
+              refinedText={refinerResult?.refined_text ?? null}
+              provider={refinerResult?.provider ?? ''}
+              processingTimeMs={refinerResult?.processing_time_ms ?? 0}
+              isRefining={isRefining}
+              error={refinerError}
+              onSelectText={(text) => setEditText(text)}
+            />
+          ) : (
+            <textarea
+              className="transcription-current__editor"
+              value={editText}
+              onChange={(e) => setEditText(e.target.value)}
+              rows={3}
+            />
+          )}
 
           <div className="transcription-current__actions">
             <button className="btn btn--primary" onClick={handleCopy}>

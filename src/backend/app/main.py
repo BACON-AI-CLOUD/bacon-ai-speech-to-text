@@ -45,6 +45,7 @@ from .config import (
 )
 from .integrations.router import get_router
 from .keyboard import KeyboardEmulator
+from .refiner_api import router as refiner_router
 from .stt.whisper_engine import WhisperEngine, get_engine
 
 logger = logging.getLogger(__name__)
@@ -119,6 +120,8 @@ app = FastAPI(
     version=SERVER_VERSION,
     lifespan=lifespan,
 )
+
+app.include_router(refiner_router, prefix="/refiner", tags=["refiner"])
 
 # CORS middleware for localhost development
 app.add_middleware(
