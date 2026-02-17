@@ -23,6 +23,7 @@
   <img src="https://img.shields.io/badge/whisper-local--GPU-green.svg" alt="Whisper" />
   <img src="https://img.shields.io/badge/cost-FREE-brightgreen.svg" alt="Free" />
   <img src="https://img.shields.io/badge/privacy-100%25%20local-orange.svg" alt="Privacy" />
+  <img src="https://img.shields.io/badge/version-1.1-blue.svg" alt="v1.1" />
   <img src="https://img.shields.io/badge/status-ALPHA-red.svg" alt="Alpha" />
 </p>
 
@@ -43,9 +44,10 @@ Speaking is **3-5x faster** than typing. When you're working with AI coding assi
 
 - **Describe complex refactors** in natural language faster than you can type them
 - **Dictate detailed prompts** with context, requirements, and edge cases
-- **Brain-dump your thoughts** and let the AI make sense of them
+- **Brain-dump your thoughts** and the AI Text Refiner cleans them up automatically
 - **Keep your hands on the keyboard** for coding while using voice for AI commands
 - **Multi-task effectively** - speak to your AI while reviewing code on another screen
+- **Vibe code naturally** - ramble your ideas and let the refiner turn them into clear, structured prompts
 
 Developers using voice input with AI tools report **up to 10x productivity gains** for prompt-heavy workflows. Stop hunting for the right words on your keyboard - just say them.
 
@@ -60,6 +62,7 @@ Developers using voice input with AI tools report **up to 10x productivity gains
 | **Selectable Models** | Choose from 5 Whisper models (39MB to 1.5GB) to balance speed vs accuracy |
 | **Type Anywhere** | Automatically types transcribed text into any window - VS Code, terminal, browser |
 | **Global Hotkey** | Press F2 from any application to start/stop recording |
+| **AI Text Refiner** | Automatically clean up dictation - remove filler words, fix grammar, restructure rambling into clear prompts. Powered by Gemini, Groq, or local Ollama |
 | **Multiple Modes** | Push-to-talk, toggle button, or voice activity detection (VAD) |
 | **Mini Mode** | Collapse to a tiny widget you can dock in any corner of your screen |
 | **Real-time Feedback** | Live waveform visualization, countdown overlay, audio level meters |
@@ -89,6 +92,26 @@ Choose the right model for your hardware and needs:
 
 Models are downloaded automatically on first use with a progress indicator.
 
+### AI Text Refiner (v1.1)
+
+When you dictate naturally, your speech is full of filler words, false starts, and rambling. The AI Text Refiner automatically cleans up your transcriptions before they reach your AI tool:
+
+| What You Say | What Gets Typed |
+|-------------|----------------|
+| "um so basically i was uh thinking that we should like you know maybe try a different approach to the problem" | "I was thinking that we should maybe try a different approach to the problem." |
+| "ok so uh the thing is right we need to like deploy this to um production but first we gotta make sure that the the database migrations are like running properly" | "We need to deploy this to production, but first we've got to make sure that the database migrations are running properly." |
+| "uh yeah its its broken again" | "Yeah, it's broken again." |
+
+**Three provider options:**
+
+| Provider | Type | API Key | Best For |
+|----------|------|---------|----------|
+| **Ollama** | Local | None needed | Privacy-first, offline use, free |
+| **Gemini** | Cloud | Free tier available | Fast, high quality, generous free quota |
+| **Groq** | Cloud | Free tier available | Ultra-fast inference, great for real-time |
+
+**Perfect for vibe coding** - just brain-dump your thoughts and let the refiner turn your stream-of-consciousness into clear, actionable prompts for Claude Code, ChatGPT, or any AI assistant.
+
 ### Smart Keyboard Integration
 
 - **Auto-focus target window** - Automatically switches to your chosen application before typing
@@ -115,8 +138,10 @@ Press **F2** (configurable) from **any application** to toggle recording. No nee
 flowchart LR
     A[🎤 Microphone] -->|WebSocket| B[FastAPI Backend]
     B -->|Faster-Whisper| C[Local GPU/CPU]
-    C -->|Transcribed Text| B
+    C -->|Raw Text| B
     B -->|WebSocket| D[React Frontend]
+    D -->|Optional| R[AI Text Refiner]
+    R -->|Clean Text| D
     D -->|HTTP POST| E[Keyboard Emulator]
     E -->|SendKeys/xdotool| F[Target Application]
 
@@ -124,6 +149,7 @@ flowchart LR
     style B fill:#1a1a2e,stroke:#0f3460,color:#fff
     style C fill:#1a1a2e,stroke:#16c79a,color:#fff
     style D fill:#1a1a2e,stroke:#e94560,color:#fff
+    style R fill:#1a1a2e,stroke:#f0a500,color:#fff
     style E fill:#1a1a2e,stroke:#0f3460,color:#fff
     style F fill:#1a1a2e,stroke:#16c79a,color:#fff
 ```
@@ -145,6 +171,7 @@ graph TB
         API[REST API - Port 8765]
         WS_S[WebSocket Server]
         STT[Faster-Whisper Engine]
+        REF[AI Text Refiner]
         KB[Keyboard Emulator]
         WIN[Window Manager]
     end
@@ -159,7 +186,9 @@ graph TB
     AC -->|Audio Stream| WS_C
     WS_C <-->|WebSocket| WS_S
     WS_S -->|Audio Chunks| STT
-    STT -->|Text Result| WS_S
+    STT -->|Raw Text| WS_S
+    WS_S -->|Optional| REF
+    REF -->|Clean Text| WS_S
     VAD -->|Start/Stop| AC
     KB_UI -->|Config| KB
     API -->|HTTP| KB
@@ -179,6 +208,7 @@ sequenceDiagram
     participant Browser as React Frontend
     participant Backend as FastAPI Backend
     participant Whisper as Faster-Whisper
+    participant Refiner as AI Text Refiner
     participant Target as Target Window
 
     User->>Browser: Press F2 / Click Mic / Hold Key
@@ -189,14 +219,22 @@ sequenceDiagram
     User->>Browser: Stop Speaking (VAD) / Release Key
     Browser->>Backend: Send Final Audio Chunk
     Backend->>Whisper: Transcribe Audio
-    Whisper-->>Backend: "Hello, please refactor the auth module"
-    Backend-->>Browser: Transcription Result
+    Whisper-->>Backend: "um so like please refactor the uh auth module"
+    Backend-->>Browser: Raw Transcription
+
+    opt AI Text Refiner Enabled
+        Browser->>Backend: POST /refiner/process
+        Backend->>Refiner: Clean up text (Gemini/Groq/Ollama)
+        Refiner-->>Backend: "Please refactor the auth module."
+        Backend-->>Browser: Refined Text
+        Browser->>Browser: Show raw vs refined comparison
+    end
 
     Browser->>Backend: POST /keyboard/type
     Backend->>Target: Focus Window (SetForegroundWindow)
-    Backend->>Target: Type Text (SendKeys)
+    Backend->>Target: Type Refined Text (SendKeys)
 
-    Note over Target: Text appears in Claude Code,<br/>VS Code, or any application
+    Note over Target: Clean text appears in Claude Code,<br/>VS Code, or any application
 ```
 
 ### Global Hotkey Flow
@@ -238,13 +276,11 @@ git clone https://github.com/BACON-AI-CLOUD/bacon-ai-speech-to-text.git
 cd bacon-ai-speech-to-text
 ```
 
-#### 2. No API Keys Required
+#### 2. No API Keys Required (for core STT)
 
-**Everything is 100% free.** Whisper is an open-source model from OpenAI that runs locally on your machine - no API keys, no subscriptions, no usage limits. All 5 model sizes (tiny through large-v3) are free to download and use.
+**Speech-to-text is 100% free.** Whisper is an open-source model from OpenAI that runs locally on your machine - no API keys, no subscriptions, no usage limits.
 
-There are **zero environment variables** to configure for v1.0. Just install and run.
-
-> **Future releases** (v1.1+) will add an optional integrated AI agent for cleaning up voice transcriptions (removing filler words, fixing grammar). That feature will support multiple AI providers with their own API keys - but v1.0 needs nothing.
+> **Optional (v1.1):** The AI Text Refiner can use cloud LLMs (Gemini, Groq) for cleaning up dictation. These have free tiers. Or use **Ollama** for fully local, free refinement with no API key at all. The refiner is disabled by default - everything works without it.
 
 #### 3. Start the Backend
 
@@ -411,6 +447,23 @@ alias voice="curl -s -X POST http://localhost:8765/recording/toggle"
 | `/windows` | GET | List visible desktop windows |
 | `/integrations` | GET | List available integration backends |
 | `/integrations/send` | POST | Send text to selected backend |
+| `/refiner/process` | POST | Refine text through active LLM provider |
+| `/refiner/config` | GET | Get refiner configuration and provider status |
+| `/refiner/config` | PUT | Update refiner settings (provider, API keys, prompt) |
+| `/refiner/test` | POST | Test refiner with sample text |
+
+### Vibe Coding Workflow
+
+The AI Text Refiner transforms BACON-AI STT into the ultimate **vibe coding** tool. Instead of carefully typing precise prompts, just speak naturally:
+
+1. **Enable the Text Refiner** in Settings (select Gemini, Groq, or Ollama)
+2. **Press F2** and brain-dump your thoughts:
+   > "ok so um basically what I need is like a function that takes in a list of users and then filters out the ones that haven't logged in for like 30 days and then sends them an email reminder, oh and also make sure to handle the case where the email is invalid"
+3. **The refiner cleans it up** automatically:
+   > "Create a function that takes a list of users, filters out those who haven't logged in for 30 days, and sends them an email reminder. Handle the case where the email is invalid."
+4. **The clean text gets typed** into Claude Code, ChatGPT, or your IDE
+
+No more wrestling with phrasing. No more deleting and retyping. Just think out loud and let the AI clean it up.
 
 ### ChatGPT / Claude.ai / Any AI Chatbot
 
@@ -452,8 +505,13 @@ All settings are stored in your browser's localStorage and persist across sessio
 | Type to Keyboard | Off | Auto-type into target window |
 | Target Window | Last active | Window to type into |
 | Notifications | Off | Browser notifications for transcriptions |
+| **Text Refiner** | Off | AI-powered text cleanup (v1.1) |
+| Refiner Provider | Ollama | Ollama (local), Gemini (cloud), or Groq (cloud) |
+| Custom Prompt | Default | Override the LLM system prompt for refinement |
 
 Settings can be exported/imported as JSON files for backup or sharing.
+
+**Refiner API keys** are stored securely on the backend (`config.json`), never in the browser. Configure them through the Settings panel or via `PUT /refiner/config`.
 
 ---
 
@@ -476,9 +534,15 @@ mindmap
       NVIDIA CUDA
       WebSocket Server
       Win32 SendKeys
+      AI Text Refiner
+    Refiner Providers
+      Ollama Local
+      Gemini Cloud
+      Groq Cloud
     Features
       5 Whisper Models
       3 Activation Modes
+      AI Text Cleanup
       Global Hotkey F2
       Mini Mode
       Target Window
@@ -494,7 +558,7 @@ mindmap
 
 ## Roadmap
 
-### Current Release (v1.0) - Speech-to-Text Core
+### Current Release (v1.1) - Speech-to-Text + AI Refiner
 
 - Local Whisper transcription with GPU acceleration
 - Three activation modes (push-to-talk, toggle, VAD)
@@ -502,12 +566,13 @@ mindmap
 - Global hotkey (F2) for system-wide recording
 - Mini mode for compact screen usage
 - Settings persistence and import/export
+- **AI Text Refiner** - Clean up dictation with Gemini, Groq, or local Ollama
+- **Raw vs Refined comparison** - Side-by-side view with "Use Raw" / "Use Refined" choice
 
 ### Coming Soon
 
 | Version | Feature | Description |
 |---------|---------|-------------|
-| **v1.1** | **AI Text Refinement** | Automatically clean up "brain dump" dictation - remove filler words (um, uh, ah), fix grammar, restructure rambling into clear sentences. Powered by local or cloud LLMs |
 | **v1.2** | **Text-to-Speech (TTS)** | Hear AI responses read back to you. Integration with Edge TTS (free) and other engines for a complete voice conversation loop |
 | **v1.3** | **MCP Server Integration** | Native [Model Context Protocol](https://modelcontextprotocol.io/) server - use voice input as a Claude Code tool. Speak commands that Claude can receive directly |
 | **v1.4** | **Multi-Language** | Support for 99+ languages via Whisper's multilingual models. Auto-detect language or set preferred language |
