@@ -416,6 +416,42 @@ export function SettingsPanel({ settings, onUpdate, onReset, onExport, onImport,
             </label>
           </div>
 
+          {/* Chat with Elisabeth (Discuss Mode) */}
+          <div className="settings-section">
+            <div className="settings-group settings-group--inline">
+              <label className="settings-label settings-label--toggle">
+                <input
+                  type="checkbox"
+                  checked={settings.discussMode}
+                  onChange={(e) => onUpdate({ discussMode: e.target.checked })}
+                />
+                Chat with Elisabeth
+              </label>
+              <span className="settings-hint">
+                When enabled, your speech is answered by AI using the selected voice.
+                Uses the same AI provider configured in Text Refiner settings.
+              </span>
+            </div>
+
+            {settings.discussMode && (
+              <div className="settings-group settings-group--indent">
+                <label className="settings-label">Voice</label>
+                <select
+                  className="settings-select"
+                  value={settings.discussVoice}
+                  onChange={(e) => onUpdate({ discussVoice: e.target.value })}
+                >
+                  <option value="en-GB-SoniaNeural">Elisabeth (en-GB-SoniaNeural)</option>
+                  <option value="en-US-AriaNeural">Aria (en-US-AriaNeural)</option>
+                  <option value="en-US-JennyNeural">Jenny (en-US-JennyNeural)</option>
+                </select>
+                <span className="settings-hint">
+                  Requires a configured AI provider (Gemini/Groq/Ollama) in the Text Refiner section below.
+                </span>
+              </div>
+            )}
+          </div>
+
           {/* Text Refiner */}
           <RefinerSettings
             settings={settings}

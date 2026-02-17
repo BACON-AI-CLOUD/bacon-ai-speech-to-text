@@ -45,6 +45,7 @@ from .config import (
 )
 from .integrations.router import get_router
 from .keyboard import KeyboardEmulator
+from .discuss import router as discuss_router
 from .refiner_api import router as refiner_router
 from .stt.whisper_engine import WhisperEngine, get_engine
 
@@ -122,6 +123,7 @@ app = FastAPI(
 )
 
 app.include_router(refiner_router, prefix="/refiner", tags=["refiner"])
+app.include_router(discuss_router, prefix="/discuss", tags=["discuss"])
 
 # CORS middleware for localhost development
 app.add_middleware(

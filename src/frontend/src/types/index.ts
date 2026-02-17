@@ -55,6 +55,8 @@ export interface AppSettings {
   micOffBeepFreq: number;         // Mic-off beep frequency (Hz)
   targetWindow: string;           // Fixed window title to focus for typing (empty = Alt+Tab)
   refiner: RefinerConfig;
+  discussMode: boolean;
+  discussVoice: string;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -82,6 +84,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
     provider: 'ollama',
     customPrompt: '',
   },
+  discussMode: false,
+  discussVoice: 'en-GB-SoniaNeural',
 };
 
 export interface RefinerConfig {
@@ -99,6 +103,15 @@ export interface RefinerResult {
   processing_time_ms: number;
   tokens_used: number;
   warning?: string;
+}
+
+export interface DiscussResult {
+  question: string;
+  answer: string;
+  audio_url: string;
+  provider: string;
+  model: string;
+  latency_ms: number;
 }
 
 export type ErrorCategory = 'connection' | 'permission' | 'transcription' | 'unknown';

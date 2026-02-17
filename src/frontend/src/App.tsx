@@ -12,7 +12,7 @@ import { SettingsPanel } from './components/SettingsPanel.tsx';
 import { ErrorDisplay } from './components/ErrorDisplay.tsx';
 import { ModelProgress } from './components/ModelProgress.tsx';
 import { playCountdownBeeps, playBeep, warmUpAudio } from './utils/beep.ts';
-import type { ModelDownloadProgress, RefinerResult } from './types/index.ts';
+import type { ModelDownloadProgress, RefinerResult, DiscussResult } from './types/index.ts';
 import './App.css';
 
 function App() {
@@ -39,6 +39,9 @@ function App() {
   const [refinerResult, setRefinerResult] = useState<RefinerResult | null>(null);
   const [isRefining, setIsRefining] = useState(false);
   const [refinerError, setRefinerError] = useState<string | null>(null);
+  const [discussResult, setDiscussResult] = useState<DiscussResult | null>(null);
+  const [isDiscussing, setIsDiscussing] = useState(false);
+  const [discussError, setDiscussError] = useState<string | null>(null);
 
   const {
     connectionState,
@@ -295,10 +298,57 @@ function App() {
     }
   }, [lastResult, recordingState, setRecordingState]);
 
+  // Discuss mode: send transcription to AI and play back audio response
+  const discussResultRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!lastResult || !settings.discussMode) {
+      return;
+    }
+    if (discussResultRef.current === lastResult.text) {
+      return;
+    }
+    discussResultRef.current = lastResult.text;
+
+    setIsDiscussing(true);
+    setDiscussError(null);
+    setDiscussResult(null);
+
+    const backendHttp = settings.backendUrl
+      .replace('ws://', 'http://')
+      .replace('wss://', 'https://');
+
+    fetch(`${backendHttp}/discuss/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        text: lastResult.text,
+        voice: settings.discussVoice,
+      }),
+    })
+      .then(async (res) => {
+        if (res.ok) {
+          const data: DiscussResult = await res.json();
+          setDiscussResult(data);
+          // Play the audio response
+          const audio = new Audio(`${backendHttp}${data.audio_url}`);
+          audio.play().catch(() => {});
+        } else {
+          const errData = await res.json().catch(() => ({ error: 'Discuss failed' }));
+          setDiscussError(errData.error || 'Discuss failed');
+        }
+      })
+      .catch(() => {
+        setDiscussError('Could not reach discuss backend');
+      })
+      .finally(() => {
+        setIsDiscussing(false);
+      });
+  }, [lastResult, settings.discussMode, settings.discussVoice, settings.backendUrl]);
+
   // Refiner: post-process transcription via LLM when enabled
   const refinerResultRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!lastResult || !settings.refiner.enabled) {
+    if (!lastResult || !settings.refiner.enabled || settings.discussMode) {
       return;
     }
     // Avoid re-refining the same text
@@ -512,6 +562,15 @@ function App() {
       )}
 
       <main className="app-main">
+        <label className="discuss-toggle">
+          <input
+            type="checkbox"
+            checked={settings.discussMode}
+            onChange={(e) => updateSettings({ discussMode: e.target.checked })}
+          />
+          Chat with Elisabeth
+        </label>
+
         <AudioCapture
           recordingState={recordingState}
           activationMode={settings.activationMode}
@@ -540,6 +599,10 @@ function App() {
           refinerResult={refinerResult}
           isRefining={isRefining}
           refinerError={refinerError}
+          suppressActions={settings.discussMode}
+          discussResult={discussResult}
+          isDiscussing={isDiscussing}
+          discussError={discussError}
         />
 
         <SettingsPanel

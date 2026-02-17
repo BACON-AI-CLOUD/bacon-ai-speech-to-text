@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import type { TranscriptionResult, RefinerResult } from '../types/index.ts';
+import type { TranscriptionResult, RefinerResult, DiscussResult } from '../types/index.ts';
 import { TextComparison } from './TextComparison.tsx';
 import './TranscriptionDisplay.css';
 
@@ -15,6 +15,10 @@ interface TranscriptionDisplayProps {
   refinerResult?: RefinerResult | null;
   isRefining?: boolean;
   refinerError?: string | null;
+  suppressActions?: boolean;
+  discussResult?: DiscussResult | null;
+  isDiscussing?: boolean;
+  discussError?: string | null;
 }
 
 function formatTimestamp(ts: number): string {
@@ -51,6 +55,10 @@ export function TranscriptionDisplay({
   refinerResult = null,
   isRefining = false,
   refinerError = null,
+  suppressActions = false,
+  discussResult = null,
+  isDiscussing = false,
+  discussError = null,
 }: TranscriptionDisplayProps) {
   const [history, setHistory] = useState<TranscriptionResult[]>([]);
   const [editText, setEditText] = useState('');
@@ -75,6 +83,9 @@ export function TranscriptionDisplay({
         const updated = [lastResult, ...prev];
         return updated.slice(0, 50);
       });
+
+      // Skip actions when discuss mode is active
+      if (suppressActions) return;
 
       // Auto-copy to clipboard
       if (autoCopy && navigator.clipboard) {
@@ -105,7 +116,7 @@ export function TranscriptionDisplay({
         });
       }
     }
-  }, [lastResult, autoCopy, notificationsEnabled, typeToKeyboard, typingAutoFocus, targetWindow, backendUrl]);
+  }, [lastResult, autoCopy, notificationsEnabled, typeToKeyboard, typingAutoFocus, targetWindow, backendUrl, suppressActions]);
 
   const handleCopy = useCallback(async () => {
     try {
@@ -160,6 +171,37 @@ export function TranscriptionDisplay({
 
   return (
     <div className="transcription-display">
+      {/* Discuss mode conversation display */}
+      {(discussResult || isDiscussing || discussError) && (
+        <div className="discuss-conversation">
+          {discussResult && (
+            <>
+              <div className="discuss-bubble discuss-bubble--user">
+                <div className="discuss-bubble__text">{discussResult.question}</div>
+              </div>
+              <div className="discuss-bubble discuss-bubble--elisabeth">
+                <div className="discuss-bubble__label">Elisabeth</div>
+                <div className="discuss-bubble__text">{discussResult.answer}</div>
+                <div className="discuss-bubble__meta">
+                  {discussResult.provider} / {discussResult.model} &middot; {discussResult.latency_ms}ms
+                </div>
+              </div>
+            </>
+          )}
+          {isDiscussing && (
+            <div className="discuss-bubble discuss-bubble--elisabeth discuss-bubble--thinking">
+              <div className="discuss-bubble__label">Elisabeth</div>
+              <div className="discuss-bubble__text">Thinking...</div>
+            </div>
+          )}
+          {discussError && (
+            <div className="discuss-bubble discuss-bubble--error">
+              <div className="discuss-bubble__text">{discussError}</div>
+            </div>
+          )}
+        </div>
+      )}
+
       {lastResult && (
         <div className="transcription-current">
           <div className="transcription-current__header">
