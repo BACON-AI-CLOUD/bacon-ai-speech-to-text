@@ -1,8 +1,7 @@
 """
-Groq refiner provider for BACON-AI Voice Backend.
+OpenAI refiner provider for BACON-AI Voice Backend.
 
-Uses the Groq API (OpenAI-compatible) with Llama models for fast
-text refinement.
+Uses the OpenAI Chat Completions API for text refinement.
 """
 
 import logging
@@ -15,22 +14,25 @@ from .base import BaseRefinerProvider, RefinerResult
 
 logger = logging.getLogger(__name__)
 
-GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
-GROQ_MODELS_URL = "https://api.groq.com/openai/v1/models"
-DEFAULT_MODEL = "llama-3.3-70b-versatile"
+OPENAI_API_URL = "https://api.openai.com/v1/chat/completions"
+DEFAULT_MODEL = "gpt-4o"
 
 DEFAULT_MODELS = [
-    {"id": "llama-3.3-70b-versatile", "name": "Llama 3.3 70B Versatile"},
-    {"id": "llama-3.1-8b-instant", "name": "Llama 3.1 8B Instant"},
-    {"id": "llama-4-scout-17b-16e-instruct", "name": "Llama 4 Scout 17B"},
-    {"id": "llama-4-maverick-17b-128e-instruct", "name": "Llama 4 Maverick 17B"},
+    {"id": "gpt-4o", "name": "GPT-4o"},
+    {"id": "gpt-4o-mini", "name": "GPT-4o Mini"},
+    {"id": "gpt-4-turbo", "name": "GPT-4 Turbo"},
 ]
 
+# Prefixes that indicate chat-capable models
+_CHAT_MODEL_PREFIXES = ("gpt-4", "gpt-5", "gpt-3.5", "o1", "o3", "o4", "chatgpt")
+# Suffixes/substrings to exclude (non-chat variants)
+_EXCLUDE_SUBSTRINGS = ("audio", "realtime", "transcribe", "tts", "dall-e", "whisper", "embedding")
 
-class GroqRefinerProvider(BaseRefinerProvider):
-    """Refiner provider using the Groq API."""
 
-    PROVIDER_DISPLAY_NAME = "Groq"
+class OpenAIRefinerProvider(BaseRefinerProvider):
+    """Refiner provider using the OpenAI Chat Completions API."""
+
+    PROVIDER_DISPLAY_NAME = "OpenAI"
     REQUIRES_API_KEY = True
 
     def __init__(self, api_key: Optional[str] = None, model: Optional[str] = None):
@@ -44,14 +46,14 @@ class GroqRefinerProvider(BaseRefinerProvider):
         return self._client
 
     async def list_models(self, custom_models: list[dict] | None = None) -> list[dict]:
-        """Query Groq API for available models, fall back to custom or defaults."""
+        """Query OpenAI API for available models, filtered to chat-capable ones."""
         fallback = custom_models if custom_models is not None else list(DEFAULT_MODELS)
         if not self._api_key:
             return fallback
         try:
             client = self._get_client()
             response = await client.get(
-                GROQ_MODELS_URL,
+                "https://api.openai.com/v1/models",
                 headers={"Authorization": f"Bearer {self._api_key}"},
                 timeout=5.0,
             )
@@ -60,22 +62,30 @@ class GroqRefinerProvider(BaseRefinerProvider):
             models = []
             for m in data.get("data", []):
                 model_id = m.get("id", "")
-                if m.get("active", True):
-                    models.append({"id": model_id, "name": model_id})
+                mid_lower = model_id.lower()
+                # Include only chat-capable models
+                if not any(mid_lower.startswith(p) for p in _CHAT_MODEL_PREFIXES):
+                    continue
+                # Exclude audio/realtime/embedding variants
+                if any(exc in mid_lower for exc in _EXCLUDE_SUBSTRINGS):
+                    continue
+                models.append({"id": model_id, "name": model_id})
+            # Sort: newest/best first
+            models.sort(key=lambda x: x["id"], reverse=True)
             return models if models else fallback
         except Exception:
-            logger.warning("Failed to fetch Groq models, using %s", "custom" if custom_models else "defaults")
+            logger.warning("Failed to fetch OpenAI models, using %s", "custom" if custom_models else "defaults")
             return fallback
 
     async def test_connection(self) -> dict:
-        """Verify Groq API key by listing models."""
+        """Verify OpenAI API key by listing models."""
         if not self._api_key:
             return {"ok": False, "latency_ms": 0, "message": "API key not configured"}
         try:
             client = self._get_client()
             start = time.monotonic()
             response = await client.get(
-                GROQ_MODELS_URL,
+                "https://api.openai.com/v1/models",
                 headers={"Authorization": f"Bearer {self._api_key}"},
                 timeout=5.0,
             )
@@ -103,7 +113,7 @@ class GroqRefinerProvider(BaseRefinerProvider):
         messages: list[dict] | None = None,
     ) -> RefinerResult:
         if not self._api_key:
-            raise ValueError("Groq API key not configured")
+            raise ValueError("OpenAI API key not configured")
 
         client = self._get_client()
         start = time.monotonic()
@@ -124,7 +134,7 @@ class GroqRefinerProvider(BaseRefinerProvider):
         }
 
         response = await client.post(
-            GROQ_API_URL,
+            OPENAI_API_URL,
             json=payload,
             headers={
                 "Authorization": f"Bearer {self._api_key}",
@@ -141,7 +151,7 @@ class GroqRefinerProvider(BaseRefinerProvider):
 
         return RefinerResult(
             refined_text=refined,
-            provider="groq",
+            provider="openai",
             model=self._model,
             processing_time_ms=round(elapsed_ms, 1),
             tokens_used=tokens,
@@ -152,7 +162,7 @@ class GroqRefinerProvider(BaseRefinerProvider):
 
     def get_info(self) -> Dict[str, Any]:
         return {
-            "name": "groq",
+            "name": "openai",
             "model": self._model,
             "configured": self.is_configured(),
         }

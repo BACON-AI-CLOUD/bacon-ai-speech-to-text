@@ -54,6 +54,7 @@ class DiscussChatRequest(BaseModel):
     """Request body for POST /discuss/chat."""
 
     text: str
+    history: list[dict] = []
     provider: Optional[str] = None
     voice: str = "en-GB-SoniaNeural"
 
@@ -96,8 +97,15 @@ async def discuss_chat(request: DiscussChatRequest) -> Dict[str, Any]:
 
     try:
         provider = refiner._get_provider(target)
+        # Build full message array with system prompt + history + current message
+        messages = [{"role": "system", "content": DISCUSS_SYSTEM_PROMPT}]
+        for msg in request.history:
+            if msg.get("role") in ("user", "assistant") and msg.get("content"):
+                messages.append({"role": msg["role"], "content": msg["content"]})
+        messages.append({"role": "user", "content": request.text})
         result = await provider.refine(
-            request.text, DISCUSS_SYSTEM_PROMPT, timeout=15.0
+            request.text, DISCUSS_SYSTEM_PROMPT, timeout=15.0,
+            messages=messages,
         )
         answer = result.refined_text
         model_used = result.model

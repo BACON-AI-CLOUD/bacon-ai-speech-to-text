@@ -18,6 +18,7 @@ Endpoints:
 
 import asyncio
 import logging
+import time
 import os
 import tempfile
 from contextlib import asynccontextmanager
@@ -526,6 +527,7 @@ async def websocket_audio(websocket: WebSocket):
             "segments": result.segments,
             "model_used": result.model_used,
             "processing_time": result.processing_time,
+            "timestamp": time.time() * 1000,
         })
 
     try:

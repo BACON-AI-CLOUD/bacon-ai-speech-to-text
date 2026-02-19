@@ -141,13 +141,16 @@ class KeyboardEmulator:
                     timeout=10,
                 )
             elif self.tool == "sendkeys":
-                # WSL: Use PowerShell SendKeys
+                # WSL: Copy to clipboard then paste with Ctrl+V
+                # SendKeys.SendWait interprets special chars and has buffer limits,
+                # so clipboard paste is more reliable for longer text.
                 escaped = text.replace("'", "''")
                 subprocess.run(
                     [
                         "powershell.exe", "-c",
+                        f"Set-Clipboard -Value '{escaped}'; "
                         f"Add-Type -AssemblyName System.Windows.Forms; "
-                        f"[System.Windows.Forms.SendKeys]::SendWait('{escaped}')"
+                        f"[System.Windows.Forms.SendKeys]::SendWait('^v')"
                     ],
                     check=True,
                     timeout=10,

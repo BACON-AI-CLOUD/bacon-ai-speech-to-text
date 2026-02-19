@@ -51,6 +51,7 @@ async def test_refiner_processes_text_with_mock_provider():
     """TUT-B018: Refiner calls the active provider and returns its result."""
     refiner = Refiner()
     refiner._enabled = True
+    refiner._active_provider = "ollama"
 
     mock_provider = MagicMock()
     mock_provider.refine = AsyncMock(
@@ -82,6 +83,7 @@ async def test_refiner_fallback_on_provider_error():
     """TUT-B019: On provider failure, refiner returns raw text unchanged."""
     refiner = Refiner()
     refiner._enabled = True
+    refiner._active_provider = "ollama"
 
     mock_provider = MagicMock()
     mock_provider.refine = AsyncMock(side_effect=Exception("API timeout"))
@@ -103,6 +105,7 @@ async def test_refiner_uses_custom_prompt():
     """TUT-B020: Custom prompt additions are passed to the provider."""
     refiner = Refiner()
     refiner._enabled = True
+    refiner._active_provider = "ollama"
     refiner._custom_prompt = "Also fix technical jargon."
 
     mock_provider = MagicMock()
@@ -119,8 +122,7 @@ async def test_refiner_uses_custom_prompt():
 
     call_args = mock_provider.refine.call_args
     prompt_used = call_args[0][1]  # second positional arg is system_prompt
-    assert "Also fix technical jargon." in prompt_used
-    assert "Additional instructions:" in prompt_used
+    assert prompt_used == "Also fix technical jargon."
 
 
 # ============================================================================

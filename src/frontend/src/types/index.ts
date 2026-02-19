@@ -66,7 +66,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   silenceTimeout: 1500,
   selectedModel: 'base',
   integrationBackend: 'claude-api',
-  backendUrl: 'ws://localhost:8765',
+  backendUrl: `ws://localhost:${8700 + (__APP_VERSION__ ?? 0)}`,
   notificationsEnabled: false,
   autoCopy: false,
   typeToKeyboard: false,
@@ -82,17 +82,42 @@ export const DEFAULT_SETTINGS: AppSettings = {
   refiner: {
     enabled: false,
     provider: 'ollama',
+    model: '',
+    promptTemplate: 'cleanup',
     customPrompt: '',
   },
   discussMode: false,
   discussVoice: 'en-GB-SoniaNeural',
 };
 
+export type BuiltinPromptTemplate = 'cleanup' | 'nudge' | 'governance' | 'professional' | 'email' | 'whatsapp' | 'technical' | 'personal' | 'custom';
+export type PromptTemplate = BuiltinPromptTemplate | string;  // string allows user-saved templates
+
+export interface UserPromptTemplate {
+  label: string;
+  description: string;
+  prompt: string;
+}
+
 export interface RefinerConfig {
   enabled: boolean;
-  provider: 'groq' | 'ollama' | 'gemini';
-  customPrompt: string;  // empty = use server default
+  provider: 'claude-cli' | 'anthropic' | 'openai' | 'groq' | 'ollama' | 'gemini';
+  model: string;           // selected model ID (empty = provider default)
+  promptTemplate: PromptTemplate;  // selected prompt template
+  customPrompt: string;    // active prompt content (template or user-edited)
   // NOTE: API keys stored backend-side in config.json only
+}
+
+export interface ProviderInfo {
+  id: string;
+  name: string;
+  requires_api_key: boolean;
+  configured: boolean;
+}
+
+export interface ModelInfo {
+  id: string;
+  name: string;
 }
 
 export interface RefinerResult {

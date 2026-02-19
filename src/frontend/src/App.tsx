@@ -8,11 +8,12 @@ import { StatusBar } from './components/StatusBar.tsx';
 import { AudioCapture } from './components/AudioCapture.tsx';
 import { WaveformVisualizer } from './components/WaveformVisualizer.tsx';
 import { TranscriptionDisplay } from './components/TranscriptionDisplay.tsx';
+import { HistorySidebar } from './components/HistorySidebar.tsx';
 import { SettingsPanel } from './components/SettingsPanel.tsx';
 import { ErrorDisplay } from './components/ErrorDisplay.tsx';
 import { ModelProgress } from './components/ModelProgress.tsx';
 import { playCountdownBeeps, playBeep, warmUpAudio } from './utils/beep.ts';
-import type { ModelDownloadProgress, RefinerResult, DiscussResult } from './types/index.ts';
+import type { ModelDownloadProgress, RefinerResult, DiscussResult, TranscriptionResult } from './types/index.ts';
 import './App.css';
 
 function App() {
@@ -42,6 +43,8 @@ function App() {
   const [discussResult, setDiscussResult] = useState<DiscussResult | null>(null);
   const [isDiscussing, setIsDiscussing] = useState(false);
   const [discussError, setDiscussError] = useState<string | null>(null);
+  const [history, setHistory] = useState<TranscriptionResult[]>([]);
+  const [discussHistory, setDiscussHistory] = useState<Array<{ role: string; content: string }>>([]);
 
   const {
     connectionState,
@@ -298,6 +301,13 @@ function App() {
     }
   }, [lastResult, recordingState, setRecordingState]);
 
+  // Reset discuss conversation history when mode is toggled off
+  useEffect(() => {
+    if (!settings.discussMode) {
+      setDiscussHistory([]);
+    }
+  }, [settings.discussMode]);
+
   // Discuss mode: send transcription to AI and play back audio response
   const discussResultRef = useRef<string | null>(null);
   useEffect(() => {
@@ -322,6 +332,7 @@ function App() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         text: lastResult.text,
+        history: discussHistory,
         voice: settings.discussVoice,
       }),
     })
@@ -329,6 +340,12 @@ function App() {
         if (res.ok) {
           const data: DiscussResult = await res.json();
           setDiscussResult(data);
+          // Append both user and assistant messages to history
+          setDiscussHistory((prev) => [
+            ...prev,
+            { role: 'user', content: lastResult.text },
+            { role: 'assistant', content: data.answer },
+          ]);
           // Play the audio response
           const audio = new Audio(`${backendHttp}${data.audio_url}`);
           audio.play().catch(() => {});
@@ -343,7 +360,7 @@ function App() {
       .finally(() => {
         setIsDiscussing(false);
       });
-  }, [lastResult, settings.discussMode, settings.discussVoice, settings.backendUrl]);
+  }, [lastResult, settings.discussMode, settings.discussVoice, settings.backendUrl, discussHistory]);
 
   // Refiner: post-process transcription via LLM when enabled
   const refinerResultRef = useRef<string | null>(null);
@@ -374,6 +391,10 @@ function App() {
         if (res.ok) {
           const data: RefinerResult = await res.json();
           setRefinerResult(data);
+          // Show warning as non-blocking error (e.g. rate limit fallback)
+          if (data.warning) {
+            setRefinerError(data.warning);
+          }
         } else {
           const errData = await res.json().catch(() => ({ detail: 'Refinement failed' }));
           setRefinerError(errData.detail || 'Refinement failed');
@@ -562,58 +583,69 @@ function App() {
       )}
 
       <main className="app-main">
-        <label className="discuss-toggle">
-          <input
-            type="checkbox"
-            checked={settings.discussMode}
-            onChange={(e) => updateSettings({ discussMode: e.target.checked })}
+        <HistorySidebar
+          history={history}
+          onDeleteEntry={(index) => setHistory((prev) => prev.filter((_, i) => i !== index))}
+          onEditEntry={(index, text) => setHistory((prev) => prev.map((item, i) => i === index ? { ...item, text } : item))}
+          discussHistory={discussHistory}
+          discussMode={settings.discussMode}
+        />
+
+        <div className="app-content">
+          <label className="discuss-toggle">
+            <input
+              type="checkbox"
+              checked={settings.discussMode}
+              onChange={(e) => updateSettings({ discussMode: e.target.checked })}
+            />
+            Chat with Elisabeth
+          </label>
+
+          <AudioCapture
+            recordingState={recordingState}
+            activationMode={settings.activationMode}
+            onToggle={handleToggle}
+            permissionState={permissionState}
+            hotkey={settings.hotkey}
+            audioLevel={audioLevel}
           />
-          Chat with Elisabeth
-        </label>
 
-        <AudioCapture
-          recordingState={recordingState}
-          activationMode={settings.activationMode}
-          onToggle={handleToggle}
-          permissionState={permissionState}
-          hotkey={settings.hotkey}
-          audioLevel={audioLevel}
-        />
+          <WaveformVisualizer
+            audioStream={audioStream}
+            isRecording={recordingState === 'recording'}
+          />
 
-        <WaveformVisualizer
-          audioStream={audioStream}
-          isRecording={recordingState === 'recording'}
-        />
+          <ModelProgress progress={modelProgress} />
 
-        <ModelProgress progress={modelProgress} />
+          <TranscriptionDisplay
+            lastResult={lastResult}
+            notificationsEnabled={settings.notificationsEnabled}
+            autoCopy={settings.autoCopy}
+            typeToKeyboard={settings.typeToKeyboard}
+            typingAutoFocus={settings.typingAutoFocus}
+            targetWindow={settings.targetWindow}
+            backendUrl={settings.backendUrl}
+            refinerEnabled={settings.refiner.enabled}
+            refinerResult={refinerResult}
+            isRefining={isRefining}
+            refinerError={refinerError}
+            suppressActions={settings.discussMode}
+            discussResult={discussResult}
+            isDiscussing={isDiscussing}
+            discussError={discussError}
+            onHistoryUpdate={setHistory}
+          />
 
-        <TranscriptionDisplay
-          lastResult={lastResult}
-          notificationsEnabled={settings.notificationsEnabled}
-          autoCopy={settings.autoCopy}
-          typeToKeyboard={settings.typeToKeyboard}
-          typingAutoFocus={settings.typingAutoFocus}
-          targetWindow={settings.targetWindow}
-          backendUrl={settings.backendUrl}
-          refinerEnabled={settings.refiner.enabled}
-          refinerResult={refinerResult}
-          isRefining={isRefining}
-          refinerError={refinerError}
-          suppressActions={settings.discussMode}
-          discussResult={discussResult}
-          isDiscussing={isDiscussing}
-          discussError={discussError}
-        />
-
-        <SettingsPanel
-          settings={settings}
-          onUpdate={updateSettings}
-          onReset={resetSettings}
-          onExport={exportSettings}
-          onImport={importSettings}
-          isOpen={settingsOpen}
-          onClose={() => setSettingsOpen(false)}
-        />
+          <SettingsPanel
+            settings={settings}
+            onUpdate={updateSettings}
+            onReset={resetSettings}
+            onExport={exportSettings}
+            onImport={importSettings}
+            isOpen={settingsOpen}
+            onClose={() => setSettingsOpen(false)}
+          />
+        </div>
       </main>
 
       <ErrorDisplay error={lastError} onRetry={handleRetry} />
