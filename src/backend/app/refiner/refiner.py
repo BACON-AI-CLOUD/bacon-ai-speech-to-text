@@ -163,6 +163,7 @@ class Refiner:
         self,
         raw_text: str,
         provider_override: Optional[str] = None,
+        prompt_override: Optional[str] = None,
     ) -> RefinerResult:
         """
         Process raw transcribed text through the active refiner provider.
@@ -197,7 +198,7 @@ class Refiner:
             )
 
         target = provider_override or self._active_provider
-        prompt = self._custom_prompt if self._custom_prompt else get_default_prompt()
+        prompt = prompt_override or self._custom_prompt or get_default_prompt()
 
         try:
             provider = self._get_provider(target)

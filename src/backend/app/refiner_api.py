@@ -27,6 +27,7 @@ class RefineRequest(BaseModel):
 
     text: str
     provider: Optional[str] = None
+    custom_prompt: Optional[str] = None
 
 
 class RefinerConfigUpdate(BaseModel):
@@ -136,7 +137,11 @@ async def process_text(request: RefineRequest) -> Dict[str, Any]:
         )
 
     refiner = get_refiner()
-    result = await refiner.process(request.text, provider_override=request.provider)
+    result = await refiner.process(
+        request.text,
+        provider_override=request.provider,
+        prompt_override=request.custom_prompt or None,
+    )
 
     response = {
         "refined_text": result.refined_text,

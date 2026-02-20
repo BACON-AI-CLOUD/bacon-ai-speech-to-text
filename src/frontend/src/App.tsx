@@ -395,7 +395,10 @@ function App() {
     fetch(`${backendHttp}/refiner/process`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: lastResult.text }),
+      body: JSON.stringify({
+        text: lastResult.text,
+        ...(settings.refiner.customPrompt ? { custom_prompt: settings.refiner.customPrompt } : {}),
+      }),
     })
       .then(async (res) => {
         if (res.ok) {
@@ -416,7 +419,7 @@ function App() {
       .finally(() => {
         setIsRefining(false);
       });
-  }, [lastResult, settings.refiner.enabled, settings.backendUrl]);
+  }, [lastResult, settings.refiner.enabled, settings.backendUrl, settings.refiner.customPrompt]);
 
   // Transition processing -> idle when an error arrives
   useEffect(() => {
