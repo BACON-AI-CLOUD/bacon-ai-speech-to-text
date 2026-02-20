@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type { AppSettings, ProviderInfo, ModelInfo, PromptTemplate, BuiltinPromptTemplate } from '../types/index.ts';
 import './QuickControlsSidebar.css';
 
@@ -71,6 +71,9 @@ export function QuickControlsSidebar({
   const [providers, setProviders] = useState<ProviderInfo[]>(FALLBACK_PROVIDERS);
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [loadingModels, setLoadingModels] = useState(false);
+  const [windows, setWindows] = useState<{ title: string; process: string }[]>([]);
+  const [loadingWindows, setLoadingWindows] = useState(false);
+  const fetchedWindowsRef = useRef(false);
 
   const httpUrl = getHttpUrl(backendUrl);
   const { refiner } = settings;
@@ -81,6 +84,25 @@ export function QuickControlsSidebar({
     },
     [refiner, onUpdate],
   );
+
+  const fetchWindows = useCallback(async () => {
+    setLoadingWindows(true);
+    try {
+      const res = await fetch(`${httpUrl}/windows`);
+      if (res.ok) {
+        const data = await res.json();
+        setWindows(data.windows || []);
+      }
+    } catch { /* backend not reachable */ }
+    setLoadingWindows(false);
+  }, [httpUrl]);
+
+  // Fetch windows once on first open
+  useEffect(() => {
+    if (!isOpen || fetchedWindowsRef.current) return;
+    fetchedWindowsRef.current = true;
+    fetchWindows();
+  }, [isOpen, fetchWindows]);
 
   // Fetch providers once on open
   useEffect(() => {
@@ -319,16 +341,63 @@ export function QuickControlsSidebar({
             </label>
 
             {settings.typeToKeyboard && (
-              <div className="qcs-field">
-                <label className="qcs-label">Target window</label>
-                <input
-                  className="qcs-input"
-                  type="text"
-                  value={settings.targetWindow}
-                  onChange={(e) => onUpdate({ targetWindow: e.target.value })}
-                  placeholder="Window title (empty = Alt+Tab)"
-                />
-              </div>
+              <>
+                <label className="qcs-toggle-label" style={{ paddingLeft: '22px' }}>
+                  <input
+                    type="checkbox"
+                    checked={settings.typingAutoFocus}
+                    onChange={(e) => onUpdate({ typingAutoFocus: e.target.checked })}
+                  />
+                  <span>Auto-focus window</span>
+                </label>
+
+                <div className="qcs-field">
+                  <label className="qcs-label">Target window</label>
+                  <div className="qcs-window-row">
+                    <select
+                      className="qcs-select"
+                      value={windows.some((w) => w.title === settings.targetWindow) ? settings.targetWindow : '__custom__'}
+                      onChange={(e) => {
+                        if (e.target.value === '__none__') {
+                          onUpdate({ targetWindow: '' });
+                        } else if (e.target.value !== '__custom__') {
+                          onUpdate({ targetWindow: e.target.value });
+                        }
+                      }}
+                    >
+                      <option value="__none__">Last active (Alt+Tab)</option>
+                      {windows.map((w) => (
+                        <option key={w.title} value={w.title}>
+                          {w.title.length > 28 ? w.title.slice(0, 25) + '...' : w.title}
+                        </option>
+                      ))}
+                      {settings.targetWindow && !windows.some((w) => w.title === settings.targetWindow) && (
+                        <option value="__custom__">Custom: {settings.targetWindow.slice(0, 18)}</option>
+                      )}
+                    </select>
+                    <button
+                      className="qcs-refresh-btn"
+                      onClick={fetchWindows}
+                      title="Refresh window list"
+                      type="button"
+                      disabled={loadingWindows}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                        <polyline points="23 4 23 10 17 10" />
+                        <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+                      </svg>
+                    </button>
+                  </div>
+                  <input
+                    className="qcs-input"
+                    type="text"
+                    value={settings.targetWindow}
+                    onChange={(e) => onUpdate({ targetWindow: e.target.value })}
+                    placeholder="Or type partial title"
+                    style={{ marginTop: '4px' }}
+                  />
+                </div>
+              </>
             )}
 
             <label className="qcs-toggle-label">

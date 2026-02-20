@@ -139,7 +139,7 @@ describe('QuickControlsSidebar', () => {
       />,
     );
     fireEvent.click(screen.getByRole('tab', { name: 'Output' }));
-    expect(screen.getByPlaceholderText('Window title (empty = Alt+Tab)')).toBeDefined();
+    expect(screen.getByPlaceholderText('Or type partial title')).toBeDefined();
   });
 
   it('has closed aria-label when open', () => {

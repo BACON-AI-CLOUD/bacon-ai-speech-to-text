@@ -191,6 +191,41 @@
   color: #777;
 }
 
+/* Window selector row (dropdown + refresh) */
+.qcs-window-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.qcs-window-row .qcs-select {
+  flex: 1;
+  min-width: 0;
+}
+
+.qcs-refresh-btn {
+  background: none;
+  border: 1px solid #2a2a4e;
+  border-radius: 4px;
+  color: #666;
+  cursor: pointer;
+  padding: 4px 6px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  transition: color 0.15s, background 0.15s;
+}
+
+.qcs-refresh-btn:hover {
+  color: #a0a0b8;
+  background: #1a1a2e;
+}
+
+.qcs-refresh-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 /* Scrollbar styling */
 .qcs-body::-webkit-scrollbar {
   width: 4px;

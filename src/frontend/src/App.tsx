@@ -47,6 +47,8 @@ function App() {
   const [discussError, setDiscussError] = useState<string | null>(null);
   const [history, setHistory] = useState<TranscriptionResult[]>([]);
   const [discussHistory, setDiscussHistory] = useState<Array<{ role: string; content: string }>>([]);
+  // Ref mirrors state so the discuss effect always reads the latest history (avoids stale closure race)
+  const discussHistoryRef = useRef<Array<{ role: string; content: string }>>([]);
 
   const {
     connectionState,
@@ -306,6 +308,7 @@ function App() {
   // Reset discuss conversation history when mode is toggled off
   useEffect(() => {
     if (!settings.discussMode) {
+      discussHistoryRef.current = [];
       setDiscussHistory([]);
     }
   }, [settings.discussMode]);
@@ -329,12 +332,15 @@ function App() {
       .replace('ws://', 'http://')
       .replace('wss://', 'https://');
 
+    // Use ref to get the latest history synchronously (avoids stale closure race condition)
+    const currentHistory = discussHistoryRef.current;
+
     fetch(`${backendHttp}/discuss/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         text: lastResult.text,
-        history: discussHistory,
+        history: currentHistory,
         voice: settings.discussVoice,
       }),
     })
@@ -342,12 +348,14 @@ function App() {
         if (res.ok) {
           const data: DiscussResult = await res.json();
           setDiscussResult(data);
-          // Append both user and assistant messages to history
-          setDiscussHistory((prev) => [
-            ...prev,
+          // Append both user and assistant messages to history (update ref + state)
+          const newHistory = [
+            ...discussHistoryRef.current,
             { role: 'user', content: lastResult.text },
             { role: 'assistant', content: data.answer },
-          ]);
+          ];
+          discussHistoryRef.current = newHistory;
+          setDiscussHistory(newHistory);
           // Play the audio response
           const audio = new Audio(`${backendHttp}${data.audio_url}`);
           audio.play().catch(() => {});
@@ -362,7 +370,7 @@ function App() {
       .finally(() => {
         setIsDiscussing(false);
       });
-  }, [lastResult, settings.discussMode, settings.discussVoice, settings.backendUrl, discussHistory]);
+  }, [lastResult, settings.discussMode, settings.discussVoice, settings.backendUrl]);
 
   // Refiner: post-process transcription via LLM when enabled
   const refinerResultRef = useRef<string | null>(null);
@@ -622,7 +630,7 @@ function App() {
             refinerResult={refinerResult}
             isRefining={isRefining}
             refinerError={refinerError}
-            suppressActions={settings.discussMode}
+            suppressActions={false}
             discussResult={discussResult}
             isDiscussing={isDiscussing}
             discussError={discussError}
