@@ -105,7 +105,7 @@ export interface RefinerConfig {
   model: string;           // selected model ID (empty = provider default)
   promptTemplate: PromptTemplate;  // selected prompt template
   customPrompt: string;    // active prompt content (template or user-edited)
-  // NOTE: API keys stored backend-side in config.json only
+  // NOTE: API keys stored backend-side in .env file only
 }
 
 export interface ProviderInfo {
