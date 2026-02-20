@@ -405,6 +405,29 @@ export function QuickControlsSidebar({
                     style={{ marginTop: '4px' }}
                   />
                 </div>
+
+                <div className="qcs-field">
+                  <label className="qcs-label">Focus delay (ms)</label>
+                  <input
+                    type="number"
+                    className="qcs-input"
+                    value={settings.typingFocusDelay}
+                    min={100}
+                    max={3000}
+                    step={100}
+                    onChange={(e) => onUpdate({ typingFocusDelay: Number(e.target.value) })}
+                    style={{ marginTop: '4px' }}
+                  />
+                </div>
+
+                <label className="qcs-toggle-label" style={{ paddingLeft: '22px' }}>
+                  <input
+                    type="checkbox"
+                    checked={settings.typingFlashWindow}
+                    onChange={(e) => onUpdate({ typingFlashWindow: e.target.checked })}
+                  />
+                  <span>Flash window on paste</span>
+                </label>
               </>
             )}
 
