@@ -537,83 +537,9 @@ export function RefinerSettings({ settings, onUpdate, backendUrl }: RefinerSetti
 
       {!collapsed && (
         <div className="refiner-settings__body">
-          {/* Enable/Disable */}
-          <div className="settings-group settings-group--inline">
-            <label className="settings-label settings-label--toggle">
-              <input
-                type="checkbox"
-                checked={refiner.enabled}
-                onChange={(e) => updateRefiner({ enabled: e.target.checked })}
-              />
-              Enable text refinement
-            </label>
-          </div>
-
-          {/* Provider Dropdown */}
-          <div className="settings-group">
-            <label className="settings-label">Provider</label>
-            <select
-              className="settings-select"
-              value={refiner.provider}
-              onChange={(e) => {
-                const newProvider = e.target.value as AppSettings['refiner']['provider'];
-                updateRefiner({ provider: newProvider, model: '' });
-                setApiKey('');
-                setConnectionResult(null);
-              }}
-            >
-              {providers.length > 0
-                ? providers.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} {p.requires_api_key ? '(Cloud)' : '(Local)'}
-                    </option>
-                  ))
-                : (
-                    <>
-                      <option value="ollama">Ollama (Local)</option>
-                      <option value="groq">Groq (Cloud)</option>
-                      <option value="gemini">Google Gemini (Cloud)</option>
-                      <option value="anthropic">Anthropic (Cloud)</option>
-                      <option value="openai">OpenAI (Cloud)</option>
-                    </>
-                  )}
-            </select>
-          </div>
-
-          {/* Model Dropdown */}
-          <div className="settings-group">
-            <label className="settings-label">
-              Model
-              {DYNAMIC_PROVIDERS.has(refiner.provider) && (
-                <button
-                  className="refiner-settings__refresh-btn"
-                  onClick={() => fetchModels(refiner.provider)}
-                  disabled={loadingModels}
-                  type="button"
-                  title="Refresh model list"
-                >
-                  {loadingModels ? '\u21BB' : '\u21BB'} Refresh
-                </button>
-              )}
-            </label>
-            <select
-              className="settings-select"
-              value={refiner.model}
-              onChange={(e) => updateRefiner({ model: e.target.value })}
-              disabled={loadingModels || models.length === 0}
-            >
-              {models.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.name}
-                </option>
-              ))}
-              {models.length === 0 && (
-                <option value="">
-                  {loadingModels ? 'Loading...' : 'No models available'}
-                </option>
-              )}
-            </select>
-          </div>
+          <p className="settings-hint refiner-settings__quick-hint">
+            Use <strong>Quick Controls</strong> (›) to switch provider, model, and template.
+          </p>
 
           {/* API Key for cloud providers */}
           {selectedProviderInfo?.requires_api_key && (
@@ -672,59 +598,6 @@ export function RefinerSettings({ settings, onUpdate, backendUrl }: RefinerSetti
                 )}
               </span>
             )}
-          </div>
-
-          {/* Prompt Template */}
-          <div className="settings-group">
-            <label className="settings-label">Prompt Template</label>
-            <div className="refiner-settings__template-row">
-              <select
-                className="settings-select"
-                value={refiner.promptTemplate ?? 'cleanup'}
-                onChange={(e) => {
-                  const tmpl = e.target.value as PromptTemplate;
-                  const templateData = getTemplateData(tmpl);
-                  if (tmpl === 'custom') {
-                    updateRefiner({ promptTemplate: tmpl });
-                  } else if (tmpl === 'governance' && templateData && !templateData.prompt) {
-                    updateRefiner({ promptTemplate: tmpl });
-                  } else if (templateData) {
-                    updateRefiner({ promptTemplate: tmpl, customPrompt: templateData.prompt });
-                  }
-                  setPromptExpanded(true);
-                }}
-              >
-                <optgroup label="Built-in">
-                  {Object.entries(BUILTIN_TEMPLATES).map(([key, tmpl]) => (
-                    <option key={key} value={key}>
-                      {tmpl.label}
-                    </option>
-                  ))}
-                </optgroup>
-                {Object.keys(userPrompts).length > 0 && (
-                  <optgroup label="My Prompts">
-                    {Object.entries(userPrompts).map(([key, tmpl]) => (
-                      <option key={key} value={key}>
-                        {tmpl.label}
-                      </option>
-                    ))}
-                  </optgroup>
-                )}
-              </select>
-              {isUserTemplate && (
-                <button
-                  className="refiner-settings__delete-btn"
-                  type="button"
-                  title="Delete this prompt template"
-                  onClick={() => handleDeleteUserTemplate(refiner.promptTemplate)}
-                >
-                  &#x2715;
-                </button>
-              )}
-            </div>
-            <span className="settings-hint">
-              {getTemplateData(refiner.promptTemplate ?? 'cleanup')?.description}
-            </span>
           </div>
 
           {/* Prompt Editor */}

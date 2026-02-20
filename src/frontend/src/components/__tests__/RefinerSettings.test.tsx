@@ -16,17 +16,12 @@ const MOCK_PROVIDERS = [
   { id: 'gemini', name: 'Google Gemini', requires_api_key: true, configured: false },
 ];
 
-const MOCK_MODELS = [
-  { id: 'llama3.2', name: 'llama3.2' },
-  { id: 'llama3.1', name: 'llama3.1' },
-];
-
 function mockFetchForProviders() {
   return vi.spyOn(globalThis, 'fetch').mockImplementation((url) => {
     const urlStr = typeof url === 'string' ? url : url.toString();
     if (urlStr.includes('/refiner/providers/') && urlStr.includes('/models')) {
       return Promise.resolve(
-        new Response(JSON.stringify(MOCK_MODELS), {
+        new Response(JSON.stringify([{ id: 'llama3.2', name: 'llama3.2' }]), {
           status: 200,
           headers: { 'Content-Type': 'application/json' },
         }),
@@ -76,78 +71,33 @@ describe('RefinerSettings', () => {
     fireEvent.click(toggle);
   }
 
-  it('renders provider dropdown with 5 options after fetching', async () => {
+  it('renders collapsed by default', () => {
+    mockFetchForProviders();
+    render(<RefinerSettings {...defaultProps} />);
+    expect(screen.queryByPlaceholderText(/enter api key/i)).not.toBeInTheDocument();
+  });
+
+  it('expands on toggle click', () => {
     mockFetchForProviders();
     render(<RefinerSettings {...defaultProps} />);
     expandSection();
-
-    // Wait for providers to load by checking for a provider option
-    await waitFor(() => {
-      const selects = document.querySelectorAll('select.settings-select');
-      expect(selects.length).toBeGreaterThanOrEqual(1);
-      const providerSelect = selects[0];
-      const options = providerSelect.querySelectorAll('option');
-      expect(options.length).toBe(5);
-    });
+    expect(screen.getByText(/quick controls/i)).toBeInTheDocument();
   });
 
-  it('shows model dropdown that loads models', async () => {
+  it('shows quick controls hint instead of duplicate dropdowns', () => {
     mockFetchForProviders();
     render(<RefinerSettings {...defaultProps} />);
     expandSection();
-
-    await waitFor(() => {
-      const selects = document.querySelectorAll('select.settings-select');
-      expect(selects.length).toBe(3);  // Provider, Model, Prompt Template
-      const modelSelect = selects[1];
-      const options = modelSelect.querySelectorAll('option');
-      expect(options.length).toBeGreaterThanOrEqual(2);
-    });
-  });
-
-  it('shows refresh button for ollama provider', async () => {
-    mockFetchForProviders();
-    render(<RefinerSettings {...defaultProps} />);
-    expandSection();
-
-    await waitFor(() => {
-      expect(screen.getByTitle('Refresh model list')).toBeInTheDocument();
-    });
-  });
-
-  it('shows refresh button for groq provider', async () => {
-    mockFetchForProviders();
-    const settings = makeSettings({
-      refiner: { enabled: true, provider: 'groq', model: '', customPrompt: '' },
-    });
-    render(<RefinerSettings {...defaultProps} settings={settings} />);
-    expandSection();
-
-    await waitFor(() => {
-      expect(screen.getByTitle('Refresh model list')).toBeInTheDocument();
-    });
-  });
-
-  it('does not show refresh button for anthropic provider', async () => {
-    mockFetchForProviders();
-    const settings = makeSettings({
-      refiner: { enabled: true, provider: 'anthropic', model: '', customPrompt: '' },
-    });
-    render(<RefinerSettings {...defaultProps} settings={settings} />);
-    expandSection();
-
-    // Wait for providers to load
-    await waitFor(() => {
-      const selects = document.querySelectorAll('select.settings-select');
-      expect(selects.length).toBeGreaterThanOrEqual(1);
-    });
-    expect(screen.queryByTitle('Refresh model list')).not.toBeInTheDocument();
+    expect(screen.getByText(/quick controls/i)).toBeInTheDocument();
+    // Provider and model dropdowns removed - not present
+    expect(screen.queryByText(/^Provider$/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Model$/i)).not.toBeInTheDocument();
   });
 
   it('shows api key input for cloud providers', async () => {
     mockFetchForProviders();
     const settings = makeSettings({
-      refiner: { enabled: true, provider: 'groq', model: '', customPrompt: '' },
+      refiner: { enabled: true, provider: 'groq', model: '', customPrompt: '', promptTemplate: 'cleanup' },
     });
     render(<RefinerSettings {...defaultProps} settings={settings} />);
     expandSection();
@@ -157,24 +107,14 @@ describe('RefinerSettings', () => {
     });
   });
 
-  it('does not show api key input for ollama', async () => {
+  it('does not show api key input for ollama', () => {
     mockFetchForProviders();
     render(<RefinerSettings {...defaultProps} />);
     expandSection();
-
-    // Wait for providers to load
-    await waitFor(() => {
-      const selects = document.querySelectorAll('select.settings-select');
-      const providerSelect = selects[0];
-      if (providerSelect) {
-        const options = providerSelect.querySelectorAll('option');
-        expect(options.length).toBe(5);
-      }
-    });
     expect(screen.queryByPlaceholderText(/enter api key/i)).not.toBeInTheDocument();
   });
 
-  it('shows ollama host url only for ollama provider', async () => {
+  it('shows ollama host url for ollama provider', async () => {
     mockFetchForProviders();
     render(<RefinerSettings {...defaultProps} />);
     expandSection();
@@ -184,18 +124,19 @@ describe('RefinerSettings', () => {
     });
   });
 
-  it('toggle enables and disables refiner', async () => {
+  it('shows test connection button', () => {
     mockFetchForProviders();
-    const onUpdate = vi.fn();
-    render(<RefinerSettings {...defaultProps} onUpdate={onUpdate} />);
+    render(<RefinerSettings {...defaultProps} />);
     expandSection();
+    expect(screen.getByTestId('test-connection-btn')).toBeInTheDocument();
+  });
 
-    const checkbox = screen.getByLabelText(/enable text refinement/i);
-    fireEvent.click(checkbox);
-
-    expect(onUpdate).toHaveBeenCalledWith({
-      refiner: { ...DEFAULT_SETTINGS.refiner, enabled: true },
-    });
+  it('shows save and test refiner buttons', () => {
+    mockFetchForProviders();
+    render(<RefinerSettings {...defaultProps} />);
+    expandSection();
+    expect(screen.getByText('Save to Backend')).toBeInTheDocument();
+    expect(screen.getByTestId('test-refiner-btn')).toBeInTheDocument();
   });
 
   it('test button calls refiner test endpoint', async () => {
@@ -203,8 +144,7 @@ describe('RefinerSettings', () => {
     render(<RefinerSettings {...defaultProps} />);
     expandSection();
 
-    const testBtn = screen.getByTestId('test-refiner-btn');
-    fireEvent.click(testBtn);
+    fireEvent.click(screen.getByTestId('test-refiner-btn'));
 
     await waitFor(() => {
       const testCall = fetchSpy.mock.calls.find(
@@ -218,23 +158,10 @@ describe('RefinerSettings', () => {
     });
   });
 
-  it('refresh button re-fetches models', async () => {
-    const fetchSpy = mockFetchForProviders();
+  it('shows prompt editor toggle', () => {
+    mockFetchForProviders();
     render(<RefinerSettings {...defaultProps} />);
     expandSection();
-
-    await waitFor(() => {
-      expect(screen.getByTitle('Refresh model list')).toBeInTheDocument();
-    });
-
-    const refreshBtn = screen.getByTitle('Refresh model list');
-    fireEvent.click(refreshBtn);
-
-    await waitFor(() => {
-      const modelCalls = fetchSpy.mock.calls.filter(
-        (call) => typeof call[0] === 'string' && call[0].includes('/models'),
-      );
-      expect(modelCalls.length).toBeGreaterThanOrEqual(2);
-    });
+    expect(screen.getByText(/view \/ edit prompt/i)).toBeInTheDocument();
   });
 });

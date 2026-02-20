@@ -3,6 +3,17 @@
   padding-top: 12px;
 }
 
+.refiner-settings__quick-hint {
+  font-size: 0.78rem;
+  color: #666;
+  margin: 0 0 8px;
+  line-height: 1.4;
+}
+
+.refiner-settings__quick-hint strong {
+  color: #888;
+}
+
 .refiner-settings__toggle {
   width: 100%;
   background: none;
