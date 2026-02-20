@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { AppSettings, ProviderInfo, ModelInfo, PromptTemplate, BuiltinPromptTemplate } from '../types/index.ts';
+import { BUILTIN_TEMPLATES } from './RefinerSettings.tsx';
 import './QuickControlsSidebar.css';
 
 interface QuickControlsSidebarProps {
@@ -172,9 +173,16 @@ export function QuickControlsSidebar({
 
   const handleTemplateChange = useCallback(
     (tmpl: string) => {
-      updateRefiner({ promptTemplate: tmpl as PromptTemplate });
+      // Also update customPrompt so the new template's prompt is sent on the next process call
+      const builtinPrompt = BUILTIN_TEMPLATES[tmpl as BuiltinPromptTemplate]?.prompt;
+      const userPrompts: Record<string, { label: string; prompt: string }> = (() => {
+        try { return JSON.parse(localStorage.getItem('bacon-voice-user-prompts') || '{}'); } catch { return {}; }
+      })();
+      const userPrompt = userPrompts[tmpl]?.prompt;
+      const newPrompt = builtinPrompt ?? userPrompt ?? refiner.customPrompt;
+      updateRefiner({ promptTemplate: tmpl as PromptTemplate, customPrompt: newPrompt });
     },
-    [updateRefiner],
+    [updateRefiner, refiner.customPrompt],
   );
 
   // Build list of all template options (built-in + user-saved from localStorage)

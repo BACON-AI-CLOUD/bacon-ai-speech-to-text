@@ -73,7 +73,7 @@ function saveUserPrompts(prompts: Record<string, UserPromptTemplate>): void {
   localStorage.setItem(USER_PROMPTS_KEY, JSON.stringify(prompts));
 }
 
-const BUILTIN_TEMPLATES: Record<BuiltinPromptTemplate, { label: string; description: string; prompt: string }> = {
+export const BUILTIN_TEMPLATES: Record<BuiltinPromptTemplate, { label: string; description: string; prompt: string }> = {
   cleanup: {
     label: 'Speech Cleanup',
     description: 'Remove filler words and speech artifacts, keep meaning intact',
