@@ -9,6 +9,7 @@ import { AudioCapture } from './components/AudioCapture.tsx';
 import { WaveformVisualizer } from './components/WaveformVisualizer.tsx';
 import { TranscriptionDisplay } from './components/TranscriptionDisplay.tsx';
 import { HistorySidebar } from './components/HistorySidebar.tsx';
+import { QuickControlsSidebar } from './components/QuickControlsSidebar.tsx';
 import { SettingsPanel } from './components/SettingsPanel.tsx';
 import { ErrorDisplay } from './components/ErrorDisplay.tsx';
 import { ModelProgress } from './components/ModelProgress.tsx';
@@ -34,6 +35,7 @@ function App() {
   }, []);
 
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [quickControlsOpen, setQuickControlsOpen] = useState(true);
   const [remoteTriggered, setRemoteTriggered] = useState(false);
   const [countdown, setCountdown] = useState(0); // 3,2,1,0 - 0 = not counting
   const [miniMode, setMiniMode] = useState(false);
@@ -592,15 +594,6 @@ function App() {
         />
 
         <div className="app-content">
-          <label className="discuss-toggle">
-            <input
-              type="checkbox"
-              checked={settings.discussMode}
-              onChange={(e) => updateSettings({ discussMode: e.target.checked })}
-            />
-            Chat with Elisabeth
-          </label>
-
           <AudioCapture
             recordingState={recordingState}
             activationMode={settings.activationMode}
@@ -647,6 +640,14 @@ function App() {
           />
         </div>
       </main>
+
+      <QuickControlsSidebar
+        settings={settings}
+        onUpdate={updateSettings}
+        backendUrl={settings.backendUrl}
+        isOpen={quickControlsOpen}
+        onToggle={() => setQuickControlsOpen((prev) => !prev)}
+      />
 
       <ErrorDisplay error={lastError} onRetry={handleRetry} />
 

@@ -1,0 +1,204 @@
+/* ==================== Quick Controls Sidebar ==================== */
+
+/* Toggle button: always visible on the right edge below the header */
+.qcs-toggle-btn {
+  position: fixed;
+  right: 0;
+  top: 109px;
+  z-index: 200;
+  background: #1a1a2e;
+  border: 1px solid #2a2a4e;
+  border-right: none;
+  border-radius: 8px 0 0 8px;
+  color: #888;
+  padding: 10px 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s, background 0.2s, right 0.2s ease;
+}
+
+.qcs-toggle-btn--open {
+  right: 220px;
+}
+
+.qcs-toggle-btn:hover {
+  color: #e0e0f0;
+  background: #22223a;
+}
+
+/* Sidebar panel - starts below the header */
+.quick-controls-sidebar {
+  position: fixed;
+  top: 69px;
+  right: -220px;
+  width: 220px;
+  height: calc(100vh - 69px);
+  background: #0d0d1a;
+  border-left: 1px solid #1e1e3a;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition: right 0.2s ease;
+  z-index: 150;
+}
+
+.quick-controls-sidebar--open {
+  right: 0;
+}
+
+/* Header */
+.qcs-header {
+  padding: 16px 12px 8px;
+  border-bottom: 1px solid #1e1e3a;
+  flex-shrink: 0;
+}
+
+.qcs-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #888;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+
+/* Tab bar */
+.qcs-tabs {
+  display: flex;
+  border-bottom: 1px solid #1e1e3a;
+  flex-shrink: 0;
+}
+
+.qcs-tab {
+  flex: 1;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: #666;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 8px 4px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  letter-spacing: 0.5px;
+}
+
+.qcs-tab:hover {
+  color: #b0b0c8;
+}
+
+.qcs-tab--active {
+  color: #9090d8;
+  border-bottom-color: #6666bb;
+}
+
+/* Body */
+.qcs-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Toggle label (checkbox + text) */
+.qcs-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 0.82rem;
+  color: #c0c0d8;
+  padding: 4px 0;
+}
+
+.qcs-toggle-label input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  accent-color: #6666bb;
+  cursor: pointer;
+}
+
+/* Controls group (disabled when refiner off) */
+.qcs-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: opacity 0.2s;
+}
+
+.qcs-controls--disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+/* Field */
+.qcs-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.qcs-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #777;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+}
+
+.qcs-select,
+.qcs-input {
+  background: #12121f;
+  border: 1px solid #2a2a4e;
+  border-radius: 6px;
+  color: #c0c0d8;
+  font-size: 0.8rem;
+  padding: 5px 8px;
+  width: 100%;
+  box-sizing: border-box;
+  appearance: auto;
+  transition: border-color 0.15s;
+}
+
+.qcs-select:focus,
+.qcs-input:focus {
+  outline: none;
+  border-color: #4a4a8a;
+}
+
+.qcs-select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.qcs-input::placeholder {
+  color: #444;
+}
+
+/* Hint text */
+.qcs-hint {
+  font-size: 0.72rem;
+  color: #555;
+  margin-top: 4px;
+  line-height: 1.4;
+}
+
+.qcs-hint strong {
+  color: #777;
+}
+
+/* Scrollbar styling */
+.qcs-body::-webkit-scrollbar {
+  width: 4px;
+}
+.qcs-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+.qcs-body::-webkit-scrollbar-thumb {
+  background: #2a2a4e;
+  border-radius: 2px;
+}

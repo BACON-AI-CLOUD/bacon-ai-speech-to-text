@@ -1,0 +1,356 @@
+import { useState, useEffect, useCallback } from 'react';
+import type { AppSettings, ProviderInfo, ModelInfo, PromptTemplate, BuiltinPromptTemplate } from '../types/index.ts';
+import './QuickControlsSidebar.css';
+
+interface QuickControlsSidebarProps {
+  settings: AppSettings;
+  onUpdate: (updates: Partial<AppSettings>) => void;
+  backendUrl: string;
+  isOpen: boolean;
+  onToggle: () => void;
+}
+
+type SidebarTab = 'refiner' | 'output';
+
+const FALLBACK_PROVIDERS: ProviderInfo[] = [
+  { id: 'claude-cli', name: 'Claude Code', requires_api_key: false, configured: true },
+  { id: 'anthropic', name: 'Anthropic', requires_api_key: true, configured: false },
+  { id: 'openai', name: 'OpenAI', requires_api_key: true, configured: false },
+  { id: 'groq', name: 'Groq', requires_api_key: true, configured: false },
+  { id: 'ollama', name: 'Ollama', requires_api_key: false, configured: true },
+  { id: 'gemini', name: 'Gemini', requires_api_key: true, configured: false },
+];
+
+const FALLBACK_MODELS: Record<string, ModelInfo[]> = {
+  anthropic: [
+    { id: 'claude-opus-4-6', name: 'Claude Opus 4.6' },
+    { id: 'claude-sonnet-4-5-20250929', name: 'Claude Sonnet 4.5' },
+    { id: 'claude-haiku-4-5-20251001', name: 'Claude Haiku 4.5' },
+  ],
+  openai: [
+    { id: 'gpt-5.2', name: 'GPT-5.2' },
+    { id: 'gpt-5-mini', name: 'GPT-5 Mini' },
+    { id: 'gpt-4o', name: 'GPT-4o' },
+  ],
+  groq: [
+    { id: 'llama-3.3-70b-versatile', name: 'Llama 3.3 70B' },
+    { id: 'llama-3.1-8b-instant', name: 'Llama 3.1 8B' },
+  ],
+  ollama: [{ id: 'llama3.2', name: 'llama3.2' }],
+  gemini: [
+    { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
+    { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro' },
+  ],
+  'claude-cli': [{ id: '', name: 'Default (claude)' }],
+};
+
+const TEMPLATE_LABELS: Record<string, string> = {
+  cleanup: 'Speech Cleanup',
+  nudge: 'BACON-AI Nudge',
+  governance: 'Governance',
+  professional: 'Professional',
+  email: 'Email',
+  whatsapp: 'WhatsApp',
+  technical: 'Technical Docs',
+  personal: 'Personal',
+  custom: 'Custom',
+};
+
+function getHttpUrl(wsUrl: string): string {
+  return wsUrl.replace('ws://', 'http://').replace('wss://', 'https://');
+}
+
+export function QuickControlsSidebar({
+  settings,
+  onUpdate,
+  backendUrl,
+  isOpen,
+  onToggle,
+}: QuickControlsSidebarProps) {
+  const [activeTab, setActiveTab] = useState<SidebarTab>('refiner');
+  const [providers, setProviders] = useState<ProviderInfo[]>(FALLBACK_PROVIDERS);
+  const [models, setModels] = useState<ModelInfo[]>([]);
+  const [loadingModels, setLoadingModels] = useState(false);
+
+  const httpUrl = getHttpUrl(backendUrl);
+  const { refiner } = settings;
+
+  const updateRefiner = useCallback(
+    (updates: Partial<AppSettings['refiner']>) => {
+      onUpdate({ refiner: { ...refiner, ...updates } });
+    },
+    [refiner, onUpdate],
+  );
+
+  // Fetch providers once on open
+  useEffect(() => {
+    if (!isOpen) return;
+    fetch(`${httpUrl}/refiner/providers`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) setProviders(data);
+      })
+      .catch(() => { /* keep fallback */ });
+  }, [isOpen, httpUrl]);
+
+  // Fetch models when provider changes (or sidebar opens)
+  useEffect(() => {
+    if (!isOpen) return;
+    const provider = refiner.provider;
+    setLoadingModels(true);
+    const fallback = FALLBACK_MODELS[provider] ?? [];
+
+    fetch(`${httpUrl}/refiner/providers/${provider}/models`)
+      .then((res) => res.json())
+      .then((data) => {
+        const list = Array.isArray(data) && data.length > 0 ? data : fallback;
+        setModels(list);
+        if (list.length > 0 && !list.some((m: ModelInfo) => m.id === refiner.model)) {
+          updateRefiner({ model: list[0].id });
+        }
+      })
+      .catch(() => {
+        setModels(fallback);
+        if (fallback.length > 0 && !fallback.some((m) => m.id === refiner.model)) {
+          updateRefiner({ model: fallback[0].id });
+        }
+      })
+      .finally(() => setLoadingModels(false));
+  }, [isOpen, refiner.provider, httpUrl]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Sync provider/model changes to backend
+  const syncToBackend = useCallback(
+    (providerOverride?: string, modelOverride?: string) => {
+      const provider = providerOverride ?? refiner.provider;
+      const model = modelOverride ?? refiner.model;
+      fetch(`${httpUrl}/refiner/config`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ active_provider: provider, ...(model ? { provider_configs: { [provider]: { model } } } : {}) }),
+      }).catch(() => { /* backend not reachable */ });
+    },
+    [httpUrl, refiner.provider, refiner.model],
+  );
+
+  const handleProviderChange = useCallback(
+    (provider: string) => {
+      updateRefiner({ provider: provider as AppSettings['refiner']['provider'], model: '' });
+      syncToBackend(provider, '');
+    },
+    [updateRefiner, syncToBackend],
+  );
+
+  const handleModelChange = useCallback(
+    (model: string) => {
+      updateRefiner({ model });
+      syncToBackend(undefined, model);
+    },
+    [updateRefiner, syncToBackend],
+  );
+
+  const handleTemplateChange = useCallback(
+    (tmpl: string) => {
+      updateRefiner({ promptTemplate: tmpl as PromptTemplate });
+    },
+    [updateRefiner],
+  );
+
+  // Build list of all template options (built-in + user-saved from localStorage)
+  const userPrompts: Record<string, { label: string }> = (() => {
+    try {
+      const raw = localStorage.getItem('bacon-voice-user-prompts');
+      return raw ? JSON.parse(raw) : {};
+    } catch { return {}; }
+  })();
+
+  const builtinKeys = Object.keys(TEMPLATE_LABELS) as BuiltinPromptTemplate[];
+
+  return (
+    <>
+      {/* Collapse toggle button - always visible on the right edge */}
+      <button
+        className={`qcs-toggle-btn ${isOpen ? 'qcs-toggle-btn--open' : ''}`}
+        onClick={onToggle}
+        title={isOpen ? 'Close quick controls' : 'Open quick controls'}
+        aria-label={isOpen ? 'Close quick controls' : 'Open quick controls'}
+        aria-expanded={isOpen}
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+          {isOpen ? (
+            <polyline points="9 18 15 12 9 6" />
+          ) : (
+            <polyline points="15 18 9 12 15 6" />
+          )}
+        </svg>
+      </button>
+
+      {/* Sidebar panel */}
+      <aside className={`quick-controls-sidebar ${isOpen ? 'quick-controls-sidebar--open' : ''}`}>
+        <div className="qcs-header">
+          <span className="qcs-title">Quick Controls</span>
+        </div>
+
+        {/* Tab switcher */}
+        <div className="qcs-tabs" role="tablist">
+          <button
+            className={`qcs-tab ${activeTab === 'refiner' ? 'qcs-tab--active' : ''}`}
+            role="tab"
+            aria-selected={activeTab === 'refiner'}
+            onClick={() => setActiveTab('refiner')}
+          >
+            Refiner
+          </button>
+          <button
+            className={`qcs-tab ${activeTab === 'output' ? 'qcs-tab--active' : ''}`}
+            role="tab"
+            aria-selected={activeTab === 'output'}
+            onClick={() => setActiveTab('output')}
+          >
+            Output
+          </button>
+        </div>
+
+        {/* Refiner tab */}
+        {activeTab === 'refiner' && (
+          <div className="qcs-body" role="tabpanel">
+            {/* Enable toggle */}
+            <label className="qcs-toggle-label">
+              <input
+                type="checkbox"
+                checked={refiner.enabled}
+                onChange={(e) => updateRefiner({ enabled: e.target.checked })}
+              />
+              <span>Enable Refiner</span>
+            </label>
+
+            <div className={`qcs-controls ${!refiner.enabled ? 'qcs-controls--disabled' : ''}`}>
+              {/* Provider */}
+              <div className="qcs-field">
+                <label className="qcs-label">Provider</label>
+                <select
+                  className="qcs-select"
+                  value={refiner.provider}
+                  onChange={(e) => handleProviderChange(e.target.value)}
+                  disabled={!refiner.enabled}
+                >
+                  {providers.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                      {p.requires_api_key && !p.configured ? ' ⚠' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Model */}
+              <div className="qcs-field">
+                <label className="qcs-label">Model</label>
+                <select
+                  className="qcs-select"
+                  value={refiner.model}
+                  onChange={(e) => handleModelChange(e.target.value)}
+                  disabled={!refiner.enabled || loadingModels || models.length === 0}
+                >
+                  {models.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name}
+                    </option>
+                  ))}
+                  {models.length === 0 && (
+                    <option value="">{loadingModels ? 'Loading...' : 'No models'}</option>
+                  )}
+                </select>
+              </div>
+
+              {/* Template */}
+              <div className="qcs-field">
+                <label className="qcs-label">Template</label>
+                <select
+                  className="qcs-select"
+                  value={refiner.promptTemplate ?? 'cleanup'}
+                  onChange={(e) => handleTemplateChange(e.target.value)}
+                  disabled={!refiner.enabled}
+                >
+                  <optgroup label="Built-in">
+                    {builtinKeys.map((key) => (
+                      <option key={key} value={key}>
+                        {TEMPLATE_LABELS[key]}
+                      </option>
+                    ))}
+                  </optgroup>
+                  {Object.keys(userPrompts).length > 0 && (
+                    <optgroup label="My Prompts">
+                      {Object.entries(userPrompts).map(([key, tmpl]) => (
+                        <option key={key} value={key}>
+                          {tmpl.label}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                </select>
+              </div>
+            </div>
+
+            <p className="qcs-hint">
+              Full refiner settings in <strong>⚙ Settings</strong>
+            </p>
+          </div>
+        )}
+
+        {/* Output tab */}
+        {activeTab === 'output' && (
+          <div className="qcs-body" role="tabpanel">
+            <label className="qcs-toggle-label">
+              <input
+                type="checkbox"
+                checked={settings.autoCopy}
+                onChange={(e) => onUpdate({ autoCopy: e.target.checked })}
+              />
+              <span>Auto-copy</span>
+            </label>
+
+            <label className="qcs-toggle-label">
+              <input
+                type="checkbox"
+                checked={settings.typeToKeyboard}
+                onChange={(e) => onUpdate({ typeToKeyboard: e.target.checked })}
+              />
+              <span>Type to keyboard</span>
+            </label>
+
+            {settings.typeToKeyboard && (
+              <div className="qcs-field">
+                <label className="qcs-label">Target window</label>
+                <input
+                  className="qcs-input"
+                  type="text"
+                  value={settings.targetWindow}
+                  onChange={(e) => onUpdate({ targetWindow: e.target.value })}
+                  placeholder="Window title (empty = Alt+Tab)"
+                />
+              </div>
+            )}
+
+            <label className="qcs-toggle-label">
+              <input
+                type="checkbox"
+                checked={settings.notificationsEnabled}
+                onChange={(e) => onUpdate({ notificationsEnabled: e.target.checked })}
+              />
+              <span>Notifications</span>
+            </label>
+
+            <label className="qcs-toggle-label">
+              <input
+                type="checkbox"
+                checked={settings.discussMode}
+                onChange={(e) => onUpdate({ discussMode: e.target.checked })}
+              />
+              <span>Chat with Elisabeth</span>
+            </label>
+          </div>
+        )}
+      </aside>
+    </>
+  );
+}
