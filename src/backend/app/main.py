@@ -431,21 +431,28 @@ async def keyboard_type(request: KeyboardTypeRequest) -> Dict[str, Any]:
 
     loop = asyncio.get_event_loop()
 
-    # Focus target window or previous window before typing
-    actually_focused = False
-    if request.target_window:
-        actually_focused = await loop.run_in_executor(None, kb.focus_window_by_title, request.target_window)
-        if not actually_focused and request.auto_focus:
-            # Target window not found - fall back to Alt+Tab to last active window
-            actually_focused = await loop.run_in_executor(None, kb.focus_previous_window)
-        if actually_focused:
-            await asyncio.sleep(0.3)
-    elif request.auto_focus:
-        actually_focused = await loop.run_in_executor(None, kb.focus_previous_window)
-        if actually_focused:
-            await asyncio.sleep(0.3)
-
-    success = await loop.run_in_executor(None, kb.type_text, request.text)
+    # Use focus_and_type for atomic focus+paste (eliminates race condition on WSL)
+    needs_focus = bool(request.target_window) or request.auto_focus
+    if needs_focus:
+        actually_focused, success = await loop.run_in_executor(
+            None,
+            kb.focus_and_type,
+            request.text,
+            request.target_window,
+            request.auto_focus,
+        )
+        # Fallback: if target_window was specified but not found, try Alt+Tab
+        if request.target_window and not actually_focused and request.auto_focus:
+            actually_focused, success = await loop.run_in_executor(
+                None,
+                kb.focus_and_type,
+                request.text,
+                '',
+                True,
+            )
+    else:
+        actually_focused = False
+        success = await loop.run_in_executor(None, kb.type_text, request.text)
 
     if success:
         return {

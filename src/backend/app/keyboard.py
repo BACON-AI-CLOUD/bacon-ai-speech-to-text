@@ -161,6 +161,76 @@ class KeyboardEmulator:
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
             return False
 
+    def focus_and_type(self, text: str, target_window: str = '', use_alt_tab: bool = False) -> tuple[bool, bool]:
+        """
+        Focus a window then type text in a single atomic operation.
+
+        On WSL/sendkeys this runs as ONE PowerShell call so the focus obtained
+        in step 1 is guaranteed to still be active when Ctrl+V fires in step 2.
+        Returns (focused: bool, typed: bool).
+        """
+        if self.tool != "sendkeys":
+            # Non-WSL: fall back to separate calls (no race condition on X11/Wayland)
+            import time
+            focused = False
+            if target_window:
+                focused = self.focus_window_by_title(target_window)
+            elif use_alt_tab:
+                focused = self.focus_previous_window()
+            if focused:
+                time.sleep(0.3)
+            typed = self.type_text(text)
+            return focused, typed
+
+        escaped_text = text.replace("'", "''")
+
+        # Build the focus block (runs inside the same PS process)
+        if target_window:
+            escaped_title = target_window.replace("'", "''")
+            focus_block = (
+                "$p = Get-Process | Where-Object { "
+                "$_.MainWindowTitle -like '*" + escaped_title + "*' -and $_.MainWindowHandle -ne 0 "
+                "} | Select-Object -First 1; "
+                "if ($p) { "
+                "try { Add-Type -MemberDefinition "
+                "'[DllImport(\"user32.dll\")] public static extern bool SetForegroundWindow(IntPtr hWnd);' "
+                "-Name WinAPI -Namespace BVKB -PassThru | Out-Null } catch {}; "
+                "[BVKB.WinAPI]::SetForegroundWindow($p.MainWindowHandle) | Out-Null; "
+                "Start-Sleep -Milliseconds 500; "
+                "$focused = $true "
+                "} else { $focused = $false }; "
+            )
+        elif use_alt_tab:
+            focus_block = (
+                "Add-Type -AssemblyName System.Windows.Forms; "
+                "[System.Windows.Forms.SendKeys]::SendWait('%{TAB}'); "
+                "Start-Sleep -Milliseconds 500; "
+                "$focused = $true; "
+            )
+        else:
+            focus_block = "$focused = $false; "
+
+        paste_block = (
+            f"Set-Clipboard -Value '{escaped_text}'; "
+            "Add-Type -AssemblyName System.Windows.Forms; "
+            "[System.Windows.Forms.SendKeys]::SendWait('^v'); "
+            "Write-Output \"$focused|ok\""
+        )
+
+        try:
+            result = subprocess.run(
+                ["powershell.exe", "-c", focus_block + paste_block],
+                capture_output=True,
+                text=True,
+                timeout=15,
+            )
+            output = result.stdout.strip()
+            focused = output.startswith("True") or output.startswith("$true") or "|ok" in output and output.split("|")[0].lower() == "true"
+            typed = "|ok" in output
+            return focused, typed
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
+            return False, False
+
     def list_windows(self) -> list[dict[str, str]]:
         """Return a list of visible windows with titles. Each entry has 'title' and 'process'."""
         if self.tool == "none":
