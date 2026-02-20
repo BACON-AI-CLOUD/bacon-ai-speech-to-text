@@ -374,15 +374,18 @@ function App() {
 
   // Refiner: post-process transcription via LLM when enabled
   const refinerResultRef = useRef<string | null>(null);
+  const refinerPromptRef = useRef<string>('');
   useEffect(() => {
     if (!lastResult || !settings.refiner.enabled || settings.discussMode) {
       return;
     }
-    // Avoid re-refining the same text
-    if (refinerResultRef.current === lastResult.text) {
+    // Avoid re-refining the same text with the same prompt
+    const promptChanged = refinerPromptRef.current !== settings.refiner.customPrompt;
+    if (refinerResultRef.current === lastResult.text && !promptChanged) {
       return;
     }
     refinerResultRef.current = lastResult.text;
+    refinerPromptRef.current = settings.refiner.customPrompt;
 
     setIsRefining(true);
     setRefinerError(null);

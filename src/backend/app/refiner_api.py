@@ -46,6 +46,7 @@ class RefineTestRequest(BaseModel):
 
     text: Optional[str] = None
     provider: Optional[str] = None
+    custom_prompt: Optional[str] = None
 
 
 # =============================================================================
@@ -214,7 +215,11 @@ async def test_refiner(request: RefineTestRequest) -> Dict[str, Any]:
     refiner._enabled = True
 
     try:
-        result = await refiner.process(sample, provider_override=request.provider)
+        result = await refiner.process(
+            sample,
+            provider_override=request.provider,
+            prompt_override=request.custom_prompt or None,
+        )
         response = {
             "original": sample,
             "refined_text": result.refined_text,

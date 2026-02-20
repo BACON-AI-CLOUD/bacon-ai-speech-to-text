@@ -444,7 +444,10 @@ export function RefinerSettings({ settings, onUpdate, backendUrl }: RefinerSetti
       const res = await fetch(`${httpUrl}/refiner/test`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: 'This is a test transcription to verify the refiner is working properly.' }),
+        body: JSON.stringify({
+          text: 'This is a test transcription to verify the refiner is working properly.',
+          ...(refiner.customPrompt ? { custom_prompt: refiner.customPrompt } : {}),
+        }),
       });
       if (res.ok) {
         const data = await res.json();
@@ -475,7 +478,7 @@ export function RefinerSettings({ settings, onUpdate, backendUrl }: RefinerSetti
       });
     }
     setTesting(false);
-  }, [httpUrl, refiner.provider]);
+  }, [httpUrl, refiner.provider, refiner.customPrompt]);
 
   // Resolve template data for any key (built-in or user)
   const getTemplateData = useCallback((key: string): { label: string; description: string; prompt: string } | undefined => {
