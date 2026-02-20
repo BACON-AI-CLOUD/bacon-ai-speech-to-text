@@ -432,19 +432,29 @@ async def keyboard_type(request: KeyboardTypeRequest) -> Dict[str, Any]:
     loop = asyncio.get_event_loop()
 
     # Focus target window or previous window before typing
+    actually_focused = False
     if request.target_window:
-        focused = await loop.run_in_executor(None, kb.focus_window_by_title, request.target_window)
-        if focused:
+        actually_focused = await loop.run_in_executor(None, kb.focus_window_by_title, request.target_window)
+        if not actually_focused and request.auto_focus:
+            # Target window not found - fall back to Alt+Tab to last active window
+            actually_focused = await loop.run_in_executor(None, kb.focus_previous_window)
+        if actually_focused:
             await asyncio.sleep(0.3)
     elif request.auto_focus:
-        focused = await loop.run_in_executor(None, kb.focus_previous_window)
-        if focused:
+        actually_focused = await loop.run_in_executor(None, kb.focus_previous_window)
+        if actually_focused:
             await asyncio.sleep(0.3)
 
     success = await loop.run_in_executor(None, kb.type_text, request.text)
 
     if success:
-        return {"success": True, "tool": kb.tool, "length": len(request.text), "auto_focused": request.auto_focus}
+        return {
+            "success": True,
+            "tool": kb.tool,
+            "length": len(request.text),
+            "auto_focused": actually_focused,
+            "target_window": request.target_window or None,
+        }
     else:
         return JSONResponse(
             status_code=500,
