@@ -10,6 +10,8 @@ interface TranscriptionDisplayProps {
   typeToKeyboard?: boolean;
   typingAutoFocus?: boolean;
   targetWindow?: string;
+  typingFocusDelay?: number;
+  typingFlashWindow?: boolean;
   backendUrl?: string;
   refinerEnabled?: boolean;
   refinerResult?: RefinerResult | null;
@@ -46,6 +48,8 @@ export function TranscriptionDisplay({
   typeToKeyboard = false,
   typingAutoFocus = true,
   targetWindow = '',
+  typingFocusDelay = 500,
+  typingFlashWindow = true,
   backendUrl = 'ws://localhost:8765',
   refinerEnabled = false,
   refinerResult = null,
@@ -103,6 +107,8 @@ export function TranscriptionDisplay({
             text: lastResult.text,
             auto_focus: typingAutoFocus,
             target_window: targetWindow || undefined,
+            focus_delay_ms: typingFocusDelay,
+            flash_window: typingFlashWindow,
           }),
         }).catch(() => {});
       }
@@ -114,7 +120,7 @@ export function TranscriptionDisplay({
         });
       }
     }
-  }, [lastResult, autoCopy, notificationsEnabled, typeToKeyboard, typingAutoFocus, targetWindow, backendUrl, suppressActions, refinerEnabled, onHistoryUpdate]);
+  }, [lastResult, autoCopy, notificationsEnabled, typeToKeyboard, typingAutoFocus, targetWindow, typingFocusDelay, typingFlashWindow, backendUrl, suppressActions, refinerEnabled, onHistoryUpdate]);
 
   // When refiner is enabled, dispatch actions after refined text arrives
   useEffect(() => {
@@ -141,6 +147,8 @@ export function TranscriptionDisplay({
           text: outputText,
           auto_focus: typingAutoFocus,
           target_window: targetWindow || undefined,
+          focus_delay_ms: typingFocusDelay,
+          flash_window: typingFlashWindow,
         }),
       }).catch(() => {});
     }

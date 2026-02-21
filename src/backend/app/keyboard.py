@@ -161,7 +161,14 @@ class KeyboardEmulator:
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
             return False
 
-    def focus_and_type(self, text: str, target_window: str = '', use_alt_tab: bool = False) -> tuple[bool, bool]:
+    def focus_and_type(
+        self,
+        text: str,
+        target_window: str = '',
+        use_alt_tab: bool = False,
+        focus_delay_ms: int = 500,
+        flash_window: bool = True,
+    ) -> tuple[bool, bool]:
         """
         Focus a window then type text in a single atomic operation.
 
@@ -178,25 +185,36 @@ class KeyboardEmulator:
             elif use_alt_tab:
                 focused = self.focus_previous_window()
             if focused:
-                time.sleep(0.3)
+                time.sleep(focus_delay_ms / 1000.0)
             typed = self.type_text(text)
             return focused, typed
 
         escaped_text = text.replace("'", "''")
+        delay_ms = max(100, int(focus_delay_ms))
+
+        # Win32 helper signatures loaded once (wrapped in try/catch so re-loading is safe)
+        win32_setup = (
+            "try { Add-Type -MemberDefinition ("
+            "'[DllImport(\"user32.dll\")] public static extern bool SetForegroundWindow(IntPtr hWnd);' + "
+            "'[DllImport(\"user32.dll\")] public static extern bool FlashWindow(IntPtr hWnd, bool bInvert);'"
+            ") -Name WinAPI -Namespace BVKB -PassThru | Out-Null } catch {}; "
+        )
+
+        flash_on = "[BVKB.WinAPI]::FlashWindow($p.MainWindowHandle, $true) | Out-Null; " if flash_window else ""
+        flash_off = "[BVKB.WinAPI]::FlashWindow($p.MainWindowHandle, $false) | Out-Null; " if flash_window else ""
 
         # Build the focus block (runs inside the same PS process)
         if target_window:
             escaped_title = target_window.replace("'", "''")
             focus_block = (
+                win32_setup +
                 "$p = Get-Process | Where-Object { "
                 "$_.MainWindowTitle -like '*" + escaped_title + "*' -and $_.MainWindowHandle -ne 0 "
                 "} | Select-Object -First 1; "
                 "if ($p) { "
-                "try { Add-Type -MemberDefinition "
-                "'[DllImport(\"user32.dll\")] public static extern bool SetForegroundWindow(IntPtr hWnd);' "
-                "-Name WinAPI -Namespace BVKB -PassThru | Out-Null } catch {}; "
                 "[BVKB.WinAPI]::SetForegroundWindow($p.MainWindowHandle) | Out-Null; "
-                "Start-Sleep -Milliseconds 500; "
+                + flash_on +
+                f"Start-Sleep -Milliseconds {delay_ms}; "
                 "$focused = $true "
                 "} else { $focused = $false }; "
             )
@@ -204,16 +222,22 @@ class KeyboardEmulator:
             focus_block = (
                 "Add-Type -AssemblyName System.Windows.Forms; "
                 "[System.Windows.Forms.SendKeys]::SendWait('%{TAB}'); "
-                "Start-Sleep -Milliseconds 500; "
+                f"Start-Sleep -Milliseconds {delay_ms}; "
                 "$focused = $true; "
+                "$p = $null; "  # no hwnd for flash in alt-tab mode
             )
+            flash_on = ""   # can't flash without hwnd
+            flash_off = ""
         else:
-            focus_block = "$focused = $false; "
+            focus_block = "$focused = $false; $p = $null; "
+            flash_on = ""
+            flash_off = ""
 
         paste_block = (
             f"Set-Clipboard -Value '{escaped_text}'; "
             "Add-Type -AssemblyName System.Windows.Forms; "
             "[System.Windows.Forms.SendKeys]::SendWait('^v'); "
+            + flash_off +
             "Write-Output \"$focused|ok\""
         )
 
@@ -222,10 +246,10 @@ class KeyboardEmulator:
                 ["powershell.exe", "-c", focus_block + paste_block],
                 capture_output=True,
                 text=True,
-                timeout=15,
+                timeout=max(15, delay_ms / 1000 + 10),
             )
             output = result.stdout.strip()
-            focused = output.startswith("True") or output.startswith("$true") or "|ok" in output and output.split("|")[0].lower() == "true"
+            focused = "|ok" in output and output.split("|")[0].strip().lower() == "true"
             typed = "|ok" in output
             return focused, typed
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):

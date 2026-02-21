@@ -54,6 +54,8 @@ export interface AppSettings {
   beepVolume: number;             // Beep volume 0.0 - 1.0
   micOffBeepFreq: number;         // Mic-off beep frequency (Hz)
   targetWindow: string;           // Fixed window title to focus for typing (empty = Alt+Tab)
+  typingFocusDelay: number;       // ms to wait after focusing window before typing
+  typingFlashWindow: boolean;     // Flash the target window title bar as visual confirmation
   refiner: RefinerConfig;
   discussMode: boolean;
   discussVoice: string;
@@ -79,6 +81,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   beepVolume: 0.4,
   micOffBeepFreq: 440,
   targetWindow: '',
+  typingFocusDelay: 500,
+  typingFlashWindow: true,
   refiner: {
     enabled: false,
     provider: 'ollama',

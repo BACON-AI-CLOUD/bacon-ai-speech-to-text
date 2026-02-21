@@ -80,6 +80,8 @@ class KeyboardTypeRequest(BaseModel):
     text: str
     auto_focus: bool = False
     target_window: str = ""
+    focus_delay_ms: int = 500    # ms to wait after focusing before typing
+    flash_window: bool = True    # flash the target window title bar as visual confirmation
 
 
 # =============================================================================
@@ -440,6 +442,8 @@ async def keyboard_type(request: KeyboardTypeRequest) -> Dict[str, Any]:
             request.text,
             request.target_window,
             request.auto_focus,
+            request.focus_delay_ms,
+            request.flash_window,
         )
         # Fallback: if target_window was specified but not found, try Alt+Tab
         if request.target_window and not actually_focused and request.auto_focus:
@@ -449,6 +453,8 @@ async def keyboard_type(request: KeyboardTypeRequest) -> Dict[str, Any]:
                 request.text,
                 '',
                 True,
+                request.focus_delay_ms,
+                request.flash_window,
             )
     else:
         actually_focused = False

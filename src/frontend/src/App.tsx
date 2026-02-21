@@ -631,6 +631,8 @@ function App() {
             typeToKeyboard={settings.typeToKeyboard}
             typingAutoFocus={settings.typingAutoFocus}
             targetWindow={settings.targetWindow}
+            typingFocusDelay={settings.typingFocusDelay}
+            typingFlashWindow={settings.typingFlashWindow}
             backendUrl={settings.backendUrl}
             refinerEnabled={settings.refiner.enabled}
             refinerResult={refinerResult}
