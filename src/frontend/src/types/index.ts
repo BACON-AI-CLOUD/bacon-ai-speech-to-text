@@ -56,6 +56,7 @@ export interface AppSettings {
   targetWindow: string;           // Fixed window title to focus for typing (empty = Alt+Tab)
   typingFocusDelay: number;       // ms to wait after focusing window before typing
   typingFlashWindow: boolean;     // Flash the target window title bar as visual confirmation
+  cursorPositionMode: boolean;
   refiner: RefinerConfig;
   discussMode: boolean;
   discussVoice: string;
@@ -83,6 +84,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   targetWindow: '',
   typingFocusDelay: 500,
   typingFlashWindow: true,
+  cursorPositionMode: false,
   refiner: {
     enabled: false,
     provider: 'ollama',

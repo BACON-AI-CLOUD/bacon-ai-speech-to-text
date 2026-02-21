@@ -12,6 +12,7 @@ interface TranscriptionDisplayProps {
   targetWindow?: string;
   typingFocusDelay?: number;
   typingFlashWindow?: boolean;
+  cursorPositionMode?: boolean;
   backendUrl?: string;
   refinerEnabled?: boolean;
   refinerResult?: RefinerResult | null;
@@ -50,6 +51,7 @@ export function TranscriptionDisplay({
   targetWindow = '',
   typingFocusDelay = 500,
   typingFlashWindow = true,
+  cursorPositionMode = false,
   backendUrl = 'ws://localhost:8765',
   refinerEnabled = false,
   refinerResult = null,
@@ -105,10 +107,10 @@ export function TranscriptionDisplay({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             text: lastResult.text,
-            auto_focus: typingAutoFocus,
-            target_window: targetWindow || undefined,
+            auto_focus: cursorPositionMode ? false : typingAutoFocus,
+            target_window: cursorPositionMode ? undefined : (targetWindow || undefined),
             focus_delay_ms: typingFocusDelay,
-            flash_window: typingFlashWindow,
+            flash_window: cursorPositionMode ? false : typingFlashWindow,
           }),
         }).catch(() => {});
       }
@@ -120,7 +122,7 @@ export function TranscriptionDisplay({
         });
       }
     }
-  }, [lastResult, autoCopy, notificationsEnabled, typeToKeyboard, typingAutoFocus, targetWindow, typingFocusDelay, typingFlashWindow, backendUrl, suppressActions, refinerEnabled, onHistoryUpdate]);
+  }, [lastResult, autoCopy, notificationsEnabled, typeToKeyboard, typingAutoFocus, targetWindow, typingFocusDelay, typingFlashWindow, cursorPositionMode, backendUrl, suppressActions, refinerEnabled, onHistoryUpdate]);
 
   // When refiner is enabled, dispatch actions after refined text arrives
   useEffect(() => {
@@ -145,10 +147,10 @@ export function TranscriptionDisplay({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           text: outputText,
-          auto_focus: typingAutoFocus,
-          target_window: targetWindow || undefined,
+          auto_focus: cursorPositionMode ? false : typingAutoFocus,
+          target_window: cursorPositionMode ? undefined : (targetWindow || undefined),
           focus_delay_ms: typingFocusDelay,
-          flash_window: typingFlashWindow,
+          flash_window: cursorPositionMode ? false : typingFlashWindow,
         }),
       }).catch(() => {});
     }
@@ -159,7 +161,7 @@ export function TranscriptionDisplay({
         tag: 'bacon-voice-transcription',
       });
     }
-  }, [refinerEnabled, refinerResult, suppressActions, autoCopy, typeToKeyboard, notificationsEnabled, typingAutoFocus, targetWindow, backendUrl, lastResult]);
+  }, [refinerEnabled, refinerResult, suppressActions, autoCopy, typeToKeyboard, notificationsEnabled, typingAutoFocus, targetWindow, cursorPositionMode, backendUrl, lastResult]);
 
   const handleCopy = useCallback(async () => {
     try {

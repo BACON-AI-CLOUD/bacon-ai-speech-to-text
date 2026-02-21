@@ -633,6 +633,7 @@ function App() {
             targetWindow={settings.targetWindow}
             typingFocusDelay={settings.typingFocusDelay}
             typingFlashWindow={settings.typingFlashWindow}
+            cursorPositionMode={settings.cursorPositionMode}
             backendUrl={settings.backendUrl}
             refinerEnabled={settings.refiner.enabled}
             refinerResult={refinerResult}

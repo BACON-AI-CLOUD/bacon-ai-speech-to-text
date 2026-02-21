@@ -507,6 +507,28 @@ async def recording_toggle() -> Dict[str, Any]:
     return {"toggled": True, "clients": sent}
 
 
+@app.post("/recording/start")
+async def recording_start() -> Dict[str, Any]:
+    """
+    Start recording on all connected WebSocket clients.
+
+    Broadcasts a toggle control message. Callers should only invoke this
+    when the frontend is idle (not already recording).
+    """
+    sent = 0
+    failed = []
+    for ws in list(_connected_clients):
+        try:
+            await ws.send_json({"type": "control", "action": "toggle"})
+            sent += 1
+        except Exception:
+            failed.append(ws)
+    for ws in failed:
+        if ws in _connected_clients:
+            _connected_clients.remove(ws)
+    return {"started": True, "clients": sent}
+
+
 # =============================================================================
 # WebSocket Endpoint
 # =============================================================================

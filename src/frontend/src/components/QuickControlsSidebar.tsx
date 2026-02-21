@@ -350,7 +350,19 @@ export function QuickControlsSidebar({
 
             {settings.typeToKeyboard && (
               <>
-                <label className="qcs-toggle-label" style={{ paddingLeft: '22px' }}>
+                <label className="qcs-toggle-label">
+                  <input
+                    type="checkbox"
+                    checked={settings.cursorPositionMode}
+                    onChange={(e) => onUpdate({ cursorPositionMode: e.target.checked })}
+                  />
+                  <span>Cursor Position mode</span>
+                </label>
+                <p className="qcs-hint" style={{ paddingLeft: '22px', marginTop: '2px' }}>
+                  Hear beeps → switch to your app → text pastes at cursor
+                </p>
+
+                <label className="qcs-toggle-label" style={{ paddingLeft: '22px', opacity: settings.cursorPositionMode ? 0.4 : 1, pointerEvents: settings.cursorPositionMode ? 'none' : 'auto' }}>
                   <input
                     type="checkbox"
                     checked={settings.typingAutoFocus}
@@ -359,7 +371,7 @@ export function QuickControlsSidebar({
                   <span>Auto-focus window</span>
                 </label>
 
-                <div className="qcs-field">
+                <div className="qcs-field" style={{ opacity: settings.cursorPositionMode ? 0.4 : 1, pointerEvents: settings.cursorPositionMode ? 'none' : 'auto' }}>
                   <label className="qcs-label">Target window</label>
                   <div className="qcs-window-row">
                     <select
