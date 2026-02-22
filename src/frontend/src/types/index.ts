@@ -57,6 +57,10 @@ export interface AppSettings {
   typingFocusDelay: number;       // ms to wait after focusing window before typing
   typingFlashWindow: boolean;     // Flash the target window title bar as visual confirmation
   cursorPositionMode: boolean;
+  announcementMode: 'beep' | 'voice';  // countdown beeps vs Elisabeth TTS announcement
+  startMessage: string;                 // "Mic opens" voice announcement
+  stopMessage: string;                  // "After recording stops" voice announcement
+  writeMessage: string;                 // "Before typing" voice announcement
   refiner: RefinerConfig;
   discussMode: boolean;
   discussVoice: string;
@@ -85,6 +89,10 @@ export const DEFAULT_SETTINGS: AppSettings = {
   typingFocusDelay: 500,
   typingFlashWindow: true,
   cursorPositionMode: false,
+  announcementMode: 'beep',
+  startMessage: 'Colin, please speak now.',
+  stopMessage: 'Place your cursor — refining now.',
+  writeMessage: 'Writing now.',
   refiner: {
     enabled: false,
     provider: 'ollama',

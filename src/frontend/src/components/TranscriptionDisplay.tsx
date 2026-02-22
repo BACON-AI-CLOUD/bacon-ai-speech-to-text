@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import type { TranscriptionResult, RefinerResult, DiscussResult } from '../types/index.ts';
 import { TextComparison } from './TextComparison.tsx';
+import { playAnnouncement } from '../utils/announce.ts';
 import './TranscriptionDisplay.css';
 
 interface TranscriptionDisplayProps {
@@ -13,6 +14,9 @@ interface TranscriptionDisplayProps {
   typingFocusDelay?: number;
   typingFlashWindow?: boolean;
   cursorPositionMode?: boolean;
+  announcementMode?: 'beep' | 'voice';
+  writeMessage?: string;
+  announcementVoice?: string;
   backendUrl?: string;
   refinerEnabled?: boolean;
   refinerResult?: RefinerResult | null;
@@ -52,6 +56,9 @@ export function TranscriptionDisplay({
   typingFocusDelay = 500,
   typingFlashWindow = true,
   cursorPositionMode = false,
+  announcementMode = 'beep',
+  writeMessage = 'Writing now.',
+  announcementVoice = 'en-GB-SoniaNeural',
   backendUrl = 'ws://localhost:8765',
   refinerEnabled = false,
   refinerResult = null,
@@ -102,17 +109,22 @@ export function TranscriptionDisplay({
         const httpUrl = backendUrl
           .replace('ws://', 'http://')
           .replace('wss://', 'https://');
-        fetch(`${httpUrl}/keyboard/type`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            text: lastResult.text,
-            auto_focus: cursorPositionMode ? false : typingAutoFocus,
-            target_window: cursorPositionMode ? undefined : (targetWindow || undefined),
-            focus_delay_ms: typingFocusDelay,
-            flash_window: cursorPositionMode ? false : typingFlashWindow,
-          }),
-        }).catch(() => {});
+        (async () => {
+          if (announcementMode === 'voice') {
+            await playAnnouncement(httpUrl, writeMessage, announcementVoice);
+          }
+          fetch(`${httpUrl}/keyboard/type`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              text: lastResult.text,
+              auto_focus: cursorPositionMode ? false : typingAutoFocus,
+              target_window: cursorPositionMode ? undefined : (targetWindow || undefined),
+              focus_delay_ms: typingFocusDelay,
+              flash_window: cursorPositionMode ? false : typingFlashWindow,
+            }),
+          }).catch(() => {});
+        })();
       }
 
       if (notificationsEnabled && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
@@ -122,7 +134,7 @@ export function TranscriptionDisplay({
         });
       }
     }
-  }, [lastResult, autoCopy, notificationsEnabled, typeToKeyboard, typingAutoFocus, targetWindow, typingFocusDelay, typingFlashWindow, cursorPositionMode, backendUrl, suppressActions, refinerEnabled, onHistoryUpdate]);
+  }, [lastResult, autoCopy, notificationsEnabled, typeToKeyboard, typingAutoFocus, targetWindow, typingFocusDelay, typingFlashWindow, cursorPositionMode, announcementMode, writeMessage, announcementVoice, backendUrl, suppressActions, refinerEnabled, onHistoryUpdate]);
 
   // When refiner is enabled, dispatch actions after refined text arrives
   useEffect(() => {
@@ -142,17 +154,22 @@ export function TranscriptionDisplay({
       const httpUrl = backendUrl
         .replace('ws://', 'http://')
         .replace('wss://', 'https://');
-      fetch(`${httpUrl}/keyboard/type`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          text: outputText,
-          auto_focus: cursorPositionMode ? false : typingAutoFocus,
-          target_window: cursorPositionMode ? undefined : (targetWindow || undefined),
-          focus_delay_ms: typingFocusDelay,
-          flash_window: cursorPositionMode ? false : typingFlashWindow,
-        }),
-      }).catch(() => {});
+      (async () => {
+        if (announcementMode === 'voice') {
+          await playAnnouncement(httpUrl, writeMessage, announcementVoice);
+        }
+        fetch(`${httpUrl}/keyboard/type`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text: outputText,
+            auto_focus: cursorPositionMode ? false : typingAutoFocus,
+            target_window: cursorPositionMode ? undefined : (targetWindow || undefined),
+            focus_delay_ms: typingFocusDelay,
+            flash_window: cursorPositionMode ? false : typingFlashWindow,
+          }),
+        }).catch(() => {});
+      })();
     }
 
     if (notificationsEnabled && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
@@ -161,7 +178,7 @@ export function TranscriptionDisplay({
         tag: 'bacon-voice-transcription',
       });
     }
-  }, [refinerEnabled, refinerResult, suppressActions, autoCopy, typeToKeyboard, notificationsEnabled, typingAutoFocus, targetWindow, cursorPositionMode, backendUrl, lastResult]);
+  }, [refinerEnabled, refinerResult, suppressActions, autoCopy, typeToKeyboard, notificationsEnabled, typingAutoFocus, targetWindow, cursorPositionMode, announcementMode, writeMessage, announcementVoice, backendUrl, lastResult]);
 
   const handleCopy = useCallback(async () => {
     try {

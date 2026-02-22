@@ -59,6 +59,41 @@ class DiscussChatRequest(BaseModel):
     voice: str = "en-GB-SoniaNeural"
 
 
+class AnnounceRequest(BaseModel):
+    """Request body for POST /discuss/announce."""
+
+    message: str
+    voice: str = "en-GB-SoniaNeural"
+
+
+@router.post("/announce")
+async def voice_announce(request: AnnounceRequest) -> Dict[str, Any]:
+    """
+    Generate a short TTS announcement and return the audio URL for playback.
+
+    Converts message text to speech via edge-tts and stores the MP3 in the
+    audio cache. The frontend plays it with new Audio(url).
+    Used for recording-start, recording-stop, and before-type announcements.
+    """
+    if not request.message or not request.message.strip():
+        return JSONResponse(status_code=400, content={"error": "Empty message"})
+
+    AUDIO_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    _cleanup_old_audio()
+
+    filename = f"announce_{uuid.uuid4().hex}.mp3"
+    filepath = AUDIO_CACHE_DIR / filename
+
+    try:
+        communicate = edge_tts.Communicate(request.message.strip(), request.voice)
+        await communicate.save(str(filepath))
+    except Exception as e:
+        logger.error("edge-tts announce error: %s", e)
+        return JSONResponse(status_code=502, content={"error": f"TTS error: {e}"})
+
+    return {"audio_url": f"/discuss/audio/{filename}"}
+
+
 @router.post("/chat")
 async def discuss_chat(request: DiscussChatRequest) -> Dict[str, Any]:
     """

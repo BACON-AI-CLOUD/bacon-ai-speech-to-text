@@ -442,6 +442,62 @@ export function QuickControlsSidebar({
                   />
                   <span>Flash window on paste</span>
                 </label>
+
+                <div className="qcs-field" style={{ marginTop: '8px' }}>
+                  <label className="qcs-label">Countdown mode</label>
+                  <label className="qcs-toggle-label">
+                    <input
+                      type="radio"
+                      name="announcementMode"
+                      checked={settings.announcementMode !== 'voice'}
+                      onChange={() => onUpdate({ announcementMode: 'beep' })}
+                    />
+                    <span>Countdown beeps</span>
+                  </label>
+                  <label className="qcs-toggle-label">
+                    <input
+                      type="radio"
+                      name="announcementMode"
+                      checked={settings.announcementMode === 'voice'}
+                      onChange={() => onUpdate({ announcementMode: 'voice' })}
+                    />
+                    <span>Elisabeth voice</span>
+                  </label>
+                  {settings.announcementMode === 'voice' && (
+                    <div style={{ paddingLeft: '22px', marginTop: '4px' }}>
+                      <div className="qcs-field">
+                        <label className="qcs-label" style={{ fontSize: '11px' }}>Mic opens:</label>
+                        <input
+                          className="qcs-input"
+                          type="text"
+                          value={settings.startMessage}
+                          onChange={(e) => onUpdate({ startMessage: e.target.value })}
+                          style={{ marginTop: '2px' }}
+                        />
+                      </div>
+                      <div className="qcs-field">
+                        <label className="qcs-label" style={{ fontSize: '11px' }}>After stop:</label>
+                        <input
+                          className="qcs-input"
+                          type="text"
+                          value={settings.stopMessage}
+                          onChange={(e) => onUpdate({ stopMessage: e.target.value })}
+                          style={{ marginTop: '2px' }}
+                        />
+                      </div>
+                      <div className="qcs-field">
+                        <label className="qcs-label" style={{ fontSize: '11px' }}>Before write:</label>
+                        <input
+                          className="qcs-input"
+                          type="text"
+                          value={settings.writeMessage}
+                          onChange={(e) => onUpdate({ writeMessage: e.target.value })}
+                          style={{ marginTop: '2px' }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
               </>
             )}
 

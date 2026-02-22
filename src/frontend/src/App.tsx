@@ -14,6 +14,7 @@ import { SettingsPanel } from './components/SettingsPanel.tsx';
 import { ErrorDisplay } from './components/ErrorDisplay.tsx';
 import { ModelProgress } from './components/ModelProgress.tsx';
 import { playCountdownBeeps, playBeep, warmUpAudio } from './utils/beep.ts';
+import { playAnnouncement } from './utils/announce.ts';
 import type { ModelDownloadProgress, RefinerResult, DiscussResult, TranscriptionResult } from './types/index.ts';
 import './App.css';
 
@@ -165,29 +166,40 @@ function App() {
     console.log('[App] handleRecordingStop called');
     stopRecordingRef.current();
     sendControl({ action: 'stop' });
-    playBeep(settings.micOffBeepFreq, settings.beepDuration, settings.beepVolume);
-  }, [sendControl, settings.micOffBeepFreq, settings.beepDuration, settings.beepVolume]);
+    if (settings.announcementMode === 'voice') {
+      const httpUrl = settings.backendUrl.replace('ws://', 'http://').replace('wss://', 'https://');
+      playAnnouncement(httpUrl, settings.stopMessage, settings.discussVoice); // fire-and-forget
+    } else {
+      playBeep(settings.micOffBeepFreq, settings.beepDuration, settings.beepVolume);
+    }
+  }, [sendControl, settings.announcementMode, settings.stopMessage, settings.discussVoice, settings.backendUrl, settings.micOffBeepFreq, settings.beepDuration, settings.beepVolume]);
 
   // Countdown ref declared here so handleBeepsForCursorMode can reference it before useActivation
   const countdownInProgressRef = useRef(false);
 
-  // Cursor position mode: play countdown beeps before mic starts so user can switch to target app
+  // Cursor position mode: play countdown beeps (or Elisabeth voice) before mic starts
+  // so user can switch to target app / position cursor before speaking.
   const handleBeepsForCursorMode = useCallback(async () => {
-    if (settings.countdownBeeps === 0) return;
-    countdownInProgressRef.current = true;
-    await playCountdownBeeps(
-      {
-        count: settings.countdownBeeps,
-        intervalMs: settings.countdownIntervalMs,
-        freqStart: settings.beepFreqStart,
-        freqEnd: settings.beepFreqEnd,
-        duration: settings.beepDuration,
-        volume: settings.beepVolume,
-      },
-      (n) => setCountdown(n),
-    );
-    countdownInProgressRef.current = false;
-  }, [settings.countdownBeeps, settings.countdownIntervalMs, settings.beepFreqStart, settings.beepFreqEnd, settings.beepDuration, settings.beepVolume]);
+    if (settings.announcementMode === 'voice') {
+      const httpUrl = settings.backendUrl.replace('ws://', 'http://').replace('wss://', 'https://');
+      await playAnnouncement(httpUrl, settings.startMessage, settings.discussVoice);
+    } else {
+      if (settings.countdownBeeps === 0) return;
+      countdownInProgressRef.current = true;
+      await playCountdownBeeps(
+        {
+          count: settings.countdownBeeps,
+          intervalMs: settings.countdownIntervalMs,
+          freqStart: settings.beepFreqStart,
+          freqEnd: settings.beepFreqEnd,
+          duration: settings.beepDuration,
+          volume: settings.beepVolume,
+        },
+        (n) => setCountdown(n),
+      );
+      countdownInProgressRef.current = false;
+    }
+  }, [settings.announcementMode, settings.startMessage, settings.discussVoice, settings.backendUrl, settings.countdownBeeps, settings.countdownIntervalMs, settings.beepFreqStart, settings.beepFreqEnd, settings.beepDuration, settings.beepVolume]);
 
   const {
     recordingState,
@@ -483,29 +495,34 @@ function App() {
     }
   }, [recordingState, triggerStart, triggerStop]);
 
-  // Remote toggle: countdown beeps then start recording with VAD auto-stop
+  // Remote toggle: countdown beeps (or voice announcement) then start recording with VAD auto-stop
   const handleRemoteToggle = useCallback(async () => {
     if (recordingState === 'recording') {
       setRemoteTriggered(false);
       triggerStop();
     } else if (recordingState === 'idle' && !countdownInProgressRef.current) {
       countdownInProgressRef.current = true;
-      await playCountdownBeeps(
-        {
-          count: settings.countdownBeeps,
-          intervalMs: settings.countdownIntervalMs,
-          freqStart: settings.beepFreqStart,
-          freqEnd: settings.beepFreqEnd,
-          duration: settings.beepDuration,
-          volume: settings.beepVolume,
-        },
-        (n) => setCountdown(n),
-      );
+      if (settings.announcementMode === 'voice') {
+        const httpUrl = settings.backendUrl.replace('ws://', 'http://').replace('wss://', 'https://');
+        await playAnnouncement(httpUrl, settings.startMessage, settings.discussVoice);
+      } else {
+        await playCountdownBeeps(
+          {
+            count: settings.countdownBeeps,
+            intervalMs: settings.countdownIntervalMs,
+            freqStart: settings.beepFreqStart,
+            freqEnd: settings.beepFreqEnd,
+            duration: settings.beepDuration,
+            volume: settings.beepVolume,
+          },
+          (n) => setCountdown(n),
+        );
+      }
       setRemoteTriggered(true);
       triggerStart();
       countdownInProgressRef.current = false;
     }
-  }, [recordingState, triggerStart, triggerStop, settings.countdownBeeps, settings.countdownIntervalMs, settings.beepFreqStart, settings.beepFreqEnd, settings.beepDuration, settings.beepVolume]);
+  }, [recordingState, triggerStart, triggerStop, settings.announcementMode, settings.startMessage, settings.discussVoice, settings.backendUrl, settings.countdownBeeps, settings.countdownIntervalMs, settings.beepFreqStart, settings.beepFreqEnd, settings.beepDuration, settings.beepVolume]);
 
   // Keep ref in sync for remote toggle
   useEffect(() => {
@@ -655,6 +672,9 @@ function App() {
             typingFocusDelay={settings.typingFocusDelay}
             typingFlashWindow={settings.typingFlashWindow}
             cursorPositionMode={settings.cursorPositionMode}
+            announcementMode={settings.announcementMode}
+            writeMessage={settings.writeMessage}
+            announcementVoice={settings.discussVoice}
             backendUrl={settings.backendUrl}
             refinerEnabled={settings.refiner.enabled}
             refinerResult={refinerResult}
