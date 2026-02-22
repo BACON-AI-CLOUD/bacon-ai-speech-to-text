@@ -6,6 +6,7 @@ interface UseActivationOptions {
   hotkey: string;
   onStart: () => void;
   onStop: () => void;
+  onBeforeStart?: () => Promise<void>;
 }
 
 interface UseActivationReturn {
@@ -20,9 +21,12 @@ export function useActivation({
   hotkey,
   onStart,
   onStop,
+  onBeforeStart,
 }: UseActivationOptions): UseActivationReturn {
   const [recordingState, setRecordingState] = useState<RecordingState>('idle');
   const isActiveRef = useRef(false);
+  const onBeforeStartRef = useRef(onBeforeStart);
+  useEffect(() => { onBeforeStartRef.current = onBeforeStart; }, [onBeforeStart]);
 
   // Reset state when mode changes
   useEffect(() => {
@@ -52,7 +56,7 @@ export function useActivation({
 
     const targetKey = hotkey.toLowerCase();
 
-    const handleKeyDown = (e: KeyboardEvent) => {
+    const handleKeyDown = async (e: KeyboardEvent) => {
       // Ignore repeated keydown events (key held)
       if (e.repeat) return;
       // Ignore if typing in an input field
@@ -61,6 +65,7 @@ export function useActivation({
 
       if (e.code.toLowerCase() === targetKey || e.key.toLowerCase() === targetKey) {
         e.preventDefault();
+        if (onBeforeStartRef.current) await onBeforeStartRef.current();
         triggerStart();
       }
     };
@@ -90,7 +95,7 @@ export function useActivation({
   useEffect(() => {
     if (mode !== 'toggle') return;
 
-    const handleKeyDown = (e: KeyboardEvent) => {
+    const handleKeyDown = async (e: KeyboardEvent) => {
       if (e.repeat) return;
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
@@ -100,6 +105,7 @@ export function useActivation({
         if (isActiveRef.current) {
           triggerStop();
         } else {
+          if (onBeforeStartRef.current) await onBeforeStartRef.current();
           triggerStart();
         }
       }

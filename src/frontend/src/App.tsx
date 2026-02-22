@@ -168,6 +168,27 @@ function App() {
     playBeep(settings.micOffBeepFreq, settings.beepDuration, settings.beepVolume);
   }, [sendControl, settings.micOffBeepFreq, settings.beepDuration, settings.beepVolume]);
 
+  // Countdown ref declared here so handleBeepsForCursorMode can reference it before useActivation
+  const countdownInProgressRef = useRef(false);
+
+  // Cursor position mode: play countdown beeps before mic starts so user can switch to target app
+  const handleBeepsForCursorMode = useCallback(async () => {
+    if (settings.countdownBeeps === 0) return;
+    countdownInProgressRef.current = true;
+    await playCountdownBeeps(
+      {
+        count: settings.countdownBeeps,
+        intervalMs: settings.countdownIntervalMs,
+        freqStart: settings.beepFreqStart,
+        freqEnd: settings.beepFreqEnd,
+        duration: settings.beepDuration,
+        volume: settings.beepVolume,
+      },
+      (n) => setCountdown(n),
+    );
+    countdownInProgressRef.current = false;
+  }, [settings.countdownBeeps, settings.countdownIntervalMs, settings.beepFreqStart, settings.beepFreqEnd, settings.beepDuration, settings.beepVolume]);
+
   const {
     recordingState,
     setRecordingState,
@@ -178,6 +199,7 @@ function App() {
     hotkey: settings.hotkey,
     onStart: handleRecordingStart,
     onStop: handleRecordingStop,
+    onBeforeStart: settings.cursorPositionMode ? handleBeepsForCursorMode : undefined,
   });
 
   const { startRecording, stopRecording, audioStream, permissionState } =
@@ -462,7 +484,6 @@ function App() {
   }, [recordingState, triggerStart, triggerStop]);
 
   // Remote toggle: countdown beeps then start recording with VAD auto-stop
-  const countdownInProgressRef = useRef(false);
   const handleRemoteToggle = useCallback(async () => {
     if (recordingState === 'recording') {
       setRemoteTriggered(false);

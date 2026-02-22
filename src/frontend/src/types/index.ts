@@ -96,7 +96,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   discussVoice: 'en-GB-SoniaNeural',
 };
 
-export type BuiltinPromptTemplate = 'cleanup' | 'nudge' | 'governance' | 'professional' | 'email' | 'whatsapp' | 'technical' | 'personal' | 'custom';
+export type BuiltinPromptTemplate = 'cleanup' | 'nudge' | 'governance' | 'professional' | 'email' | 'whatsapp' | 'technical' | 'personal' | 'sheets-tsv' | 'sheets-script' | 'custom';
 export type PromptTemplate = BuiltinPromptTemplate | string;  // string allows user-saved templates
 
 export interface UserPromptTemplate {

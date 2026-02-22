@@ -60,9 +60,74 @@ function removeOverlay() {
   overlayEl = null;
 }
 
+// ─── Gmail Smart Insert ───────────────────────────────────────────────────────
+function detectGmailCompose() {
+  // Gmail compose window selector
+  const subjectInput = document.querySelector('input[name="subjectbox"], input[aria-label="Subject"]');
+  const bodyArea = document.querySelector(
+    'div[aria-label="Message Body"], div[role="textbox"][aria-label*="Body"], div.Am.Al.editable, div[g_editable="true"]'
+  );
+  return subjectInput && bodyArea ? { subjectInput, bodyArea } : null;
+}
+
+function parseEmailText(text) {
+  // Parse "Subject: ...\n\nBody..." format from email template
+  const lines = text.split('\n');
+  const subjectLine = lines.find(l => l.toLowerCase().startsWith('subject:'));
+  if (!subjectLine) return null;
+  const subject = subjectLine.replace(/^subject:\s*/i, '').trim();
+  // Body is everything after the first blank line following the Subject line
+  const subjectIdx = lines.indexOf(subjectLine);
+  const bodyLines = lines.slice(subjectIdx + 1);
+  // Skip leading blank lines
+  const firstContent = bodyLines.findIndex(l => l.trim() !== '');
+  const body = firstContent >= 0 ? bodyLines.slice(firstContent).join('\n').trim() : '';
+  return { subject, body };
+}
+
 // ─── Text Insertion ───────────────────────────────────────────────────────────
 async function insertTextAtCursor(text) {
-  // Try reaching into active iframe first
+  // ── Gmail smart insert ──────────────────────────────────────────────────────
+  if (window.location.hostname === 'mail.google.com') {
+    const gmail = detectGmailCompose();
+    if (gmail) {
+      const parsed = parseEmailText(text);
+      if (parsed && parsed.subject) {
+        // Fill subject field
+        gmail.subjectInput.focus();
+        gmail.subjectInput.value = parsed.subject;
+        gmail.subjectInput.dispatchEvent(new Event('input', { bubbles: true }));
+        gmail.subjectInput.dispatchEvent(new Event('change', { bubbles: true }));
+        // Fill body field
+        if (parsed.body) {
+          gmail.bodyArea.focus();
+          // Try execCommand first, fall back to clipboard
+          if (!document.execCommand('selectAll', false, null)) {
+            // select all existing content
+          }
+          if (document.execCommand('insertText', false, parsed.body)) {
+            showOverlay('✓ Subject + body filled');
+            return;
+          }
+          // Clipboard fallback for body
+          try {
+            await navigator.clipboard.writeText(parsed.body);
+            document.execCommand('paste');
+            showOverlay('✓ Subject filled, body pasted');
+          } catch {
+            showOverlay(`✓ Subject filled — paste body manually (Ctrl+V)`);
+            await navigator.clipboard.writeText(parsed.body).catch(() => {});
+          }
+        } else {
+          showOverlay('✓ Subject filled');
+        }
+        return;
+      }
+      // No Subject: prefix — just insert normally at current focus
+    }
+  }
+
+  // ── Standard insertion (non-Gmail or no compose window detected) ───────────
   let el = document.activeElement;
   if (el && el.tagName === 'IFRAME') {
     try {
