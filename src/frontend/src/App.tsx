@@ -541,6 +541,28 @@ function App() {
     connect();
   }, [connect]);
 
+  // Mini mode window resize: shrink the browser window to fit the widget,
+  // restore on exit. Works in PWA / "Open as window" mode; silently ignored in tabs.
+  const prevWindowSizeRef = useRef<{ w: number; h: number } | null>(null);
+  useEffect(() => {
+    if (miniMode) {
+      prevWindowSizeRef.current = { w: window.outerWidth, h: window.outerHeight };
+      document.documentElement.style.height = 'auto';
+      document.body.style.height = 'auto';
+      document.body.style.overflow = 'hidden';
+      try { window.resizeTo(280, 110); } catch { /* ignored in regular tabs */ }
+    } else {
+      document.documentElement.style.height = '';
+      document.body.style.height = '';
+      document.body.style.overflow = '';
+      const prev = prevWindowSizeRef.current;
+      if (prev) {
+        try { window.resizeTo(prev.w, prev.h); } catch { /* ignored */ }
+        prevWindowSizeRef.current = null;
+      }
+    }
+  }, [miniMode]);
+
   // Mini mode: compact widget with logo + mic button + countdown
   if (miniMode) {
     return (
