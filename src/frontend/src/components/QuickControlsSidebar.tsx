@@ -54,6 +54,8 @@ const TEMPLATE_LABELS: Record<string, string> = {
   whatsapp: 'WhatsApp',
   technical: 'Technical Docs',
   personal: 'Personal',
+  'sheets-tsv': 'Sheets — Data (TSV)',
+  'sheets-script': 'Sheets — Apps Script',
   custom: 'Custom',
 };
 
