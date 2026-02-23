@@ -1,6 +1,29 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import type { AppSettings } from '../types/index.ts';
 import './FileTranscriptionPanel.css';
+
+const TRANSCRIBING_MESSAGES = [
+  "Need to get some brain energy for this one...",
+  "Putting on my hiking boots...",
+  "Asking the neurons to wake up...",
+  "Brewing a strong coffee for this...",
+  "Listening very carefully...",
+  "Untangling words from the audio soup...",
+  "Whispering sweet nothings to Whisper...",
+  "Converting sound waves into wisdom...",
+  "Deciphering the audio mysteries...",
+  "Teaching my ears to type...",
+  "Doing linguistic gymnastics...",
+  "Warming up the transcription engines...",
+  "This might take a hot minute (or a cool one)...",
+  "Translating vibes into text...",
+  "Summoning the phoneme elves...",
+  "Running the audio through the thought machine...",
+  "Having a deep listen...",
+  "Applying maximum brain power...",
+  "The longer the video, the wiser I get...",
+  "Nearly there... probably...",
+];
 
 interface FileTranscriptionPanelProps {
   settings: AppSettings;
@@ -50,7 +73,18 @@ export function FileTranscriptionPanel({ settings, backendUrl }: FileTranscripti
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [dragging, setDragging] = useState(false);
+  const [msgIndex, setMsgIndex] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Rotate through fun messages while transcribing
+  useEffect(() => {
+    if (!transcribing) return;
+    setMsgIndex(0);
+    const interval = setInterval(() => {
+      setMsgIndex((i) => (i + 1) % TRANSCRIBING_MESSAGES.length);
+    }, 3500);
+    return () => clearInterval(interval);
+  }, [transcribing]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -244,11 +278,12 @@ export function FileTranscriptionPanel({ settings, backendUrl }: FileTranscripti
         {transcribing ? 'Transcribing...' : 'Transcribe'}
       </button>
 
-      {/* Progress */}
+      {/* Loading overlay */}
       {transcribing && (
-        <div className="progress-indicator">
-          <div className="progress-spinner" />
-          Processing audio file...
+        <div className="transcribing-overlay">
+          <div className="transcribing-spinner" />
+          <div className="transcribing-title">Transcribing...</div>
+          <div className="transcribing-msg">{TRANSCRIBING_MESSAGES[msgIndex]}</div>
         </div>
       )}
 
