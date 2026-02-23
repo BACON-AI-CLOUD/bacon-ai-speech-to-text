@@ -18,6 +18,7 @@ Endpoints:
 
 import asyncio
 import logging
+import subprocess
 import time
 import os
 import tempfile
@@ -47,6 +48,7 @@ from .config import (
 from .integrations.router import get_router
 from .keyboard import KeyboardEmulator
 from .discuss import router as discuss_router
+from .file_transcribe import router as file_transcribe_router
 from .refiner_api import router as refiner_router
 from .stt.whisper_engine import WhisperEngine, get_engine
 
@@ -127,6 +129,7 @@ app = FastAPI(
 
 app.include_router(refiner_router, prefix="/refiner", tags=["refiner"])
 app.include_router(discuss_router, prefix="/discuss", tags=["discuss"])
+app.include_router(file_transcribe_router, prefix="/transcribe/file", tags=["file-transcription"])
 
 # CORS middleware for localhost development
 app.add_middleware(
@@ -421,6 +424,55 @@ async def list_windows() -> Dict[str, Any]:
     return {"windows": windows}
 
 
+@app.get("/windows/active")
+async def get_active_window() -> Dict[str, Any]:
+    """Return the title of the currently focused Windows window via PowerShell."""
+    try:
+        ps_cmd = (
+            "Add-Type -TypeDefinition '"
+            "using System; using System.Runtime.InteropServices;"
+            "public class Win32W {"
+            "  [DllImport(\"user32.dll\")] public static extern IntPtr GetForegroundWindow();"
+            "  [DllImport(\"user32.dll\", CharSet=CharSet.Unicode)]"
+            "  public static extern int GetWindowText(IntPtr h, System.Text.StringBuilder t, int c);"
+            "}'; "
+            "$h=[Win32W]::GetForegroundWindow();"
+            "$sb=New-Object System.Text.StringBuilder 256;"
+            "[void][Win32W]::GetWindowText($h,$sb,256);"
+            "$sb.ToString()"
+        )
+        result = subprocess.run(
+            ["powershell.exe", "-NoProfile", "-Command", ps_cmd],
+            capture_output=True, text=True, timeout=5
+        )
+        return {"title": result.stdout.strip()}
+    except Exception as e:
+        return {"title": "", "error": str(e)}
+
+
+# Runtime target window for keyboard typing fallback
+_runtime_target_window: str = ""
+
+
+class SetTargetWindowRequest(BaseModel):
+    """Request body for POST /keyboard/set-target."""
+    target_window: str
+
+
+@app.post("/keyboard/set-target")
+async def set_target_window(request: SetTargetWindowRequest) -> Dict[str, Any]:
+    """Set the runtime default target window for keyboard typing."""
+    global _runtime_target_window
+    _runtime_target_window = request.target_window
+    return {"target_window": _runtime_target_window}
+
+
+@app.get("/keyboard/target")
+async def get_target_window() -> Dict[str, Any]:
+    """Get the current runtime default target window."""
+    return {"target_window": _runtime_target_window}
+
+
 @app.post("/keyboard/type")
 async def keyboard_type(request: KeyboardTypeRequest) -> Dict[str, Any]:
     """Type text at the current cursor position using system keyboard emulation."""
@@ -431,22 +483,25 @@ async def keyboard_type(request: KeyboardTypeRequest) -> Dict[str, Any]:
             content={"error": "No keyboard emulation tool available", "tool": "none"},
         )
 
+    # Fall back to runtime target window if none specified in request
+    effective_target = request.target_window or _runtime_target_window
+
     loop = asyncio.get_event_loop()
 
     # Use focus_and_type for atomic focus+paste (eliminates race condition on WSL)
-    needs_focus = bool(request.target_window) or request.auto_focus
+    needs_focus = bool(effective_target) or request.auto_focus
     if needs_focus:
         actually_focused, success = await loop.run_in_executor(
             None,
             kb.focus_and_type,
             request.text,
-            request.target_window,
+            effective_target,
             request.auto_focus,
             request.focus_delay_ms,
             request.flash_window,
         )
         # Fallback: if target_window was specified but not found, try Alt+Tab
-        if request.target_window and not actually_focused and request.auto_focus:
+        if effective_target and not actually_focused and request.auto_focus:
             actually_focused, success = await loop.run_in_executor(
                 None,
                 kb.focus_and_type,
@@ -466,7 +521,7 @@ async def keyboard_type(request: KeyboardTypeRequest) -> Dict[str, Any]:
             "tool": kb.tool,
             "length": len(request.text),
             "auto_focused": actually_focused,
-            "target_window": request.target_window or None,
+            "target_window": effective_target or None,
         }
     else:
         return JSONResponse(

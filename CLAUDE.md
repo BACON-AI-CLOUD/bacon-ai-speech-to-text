@@ -18,14 +18,14 @@
 
 | Field | Value |
 |-------|-------|
-| **Current Phase** | v1.3 UX Enhancements - PRD Draft, Pre-Implementation |
-| **Phase Status** | prd-draft |
-| **Active Features** | v1.3 UX Enhancements (REQ-301 to REQ-320) |
-| **Active Branch** | feature/v1.2-tts-edge |
-| **Last Action** | PRD-003 created, gap analysis on all docs |
-| **Next Step** | ADD-003 architecture doc, then Phase A implementation |
+| **Current Phase** | v1.4 File Transcription + Suffix Injections |
+| **Phase Status** | in-progress |
+| **Active Features** | FEAT-310 (File Transcription), FEAT-311 (Suffix Injections) |
+| **Active Branch** | feature/v1.4-file-transcription |
+| **Last Action** | v1.4 implementation complete - all agents done |
+| **Next Step** | UAT - test file transcription and suffix injections in browser |
 | **Blockers** | None |
-| **Last Updated** | 2026-02-20 by orchestrator |
+| **Last Updated** | 2026-02-23 by orchestrator |
 
 ## YOUR ROLE: ORCHESTRATOR
 
@@ -203,13 +203,20 @@ User-selectable: tiny, base, small, medium, large-v3
 | FEAT-308 | Mini-button collapse | P1 | planned | REQ-315-316 |
 | FEAT-309 | History persistence + project grouping | P0 | planned | REQ-317-320 |
 
-## TEST COUNTS (Verified 2026-02-20)
+### v1.4 Features (IN PROGRESS - feature/v1.4-file-transcription)
+
+| Feature ID | Title | Priority | Status | PRD Ref |
+|-----------|-------|----------|--------|---------|
+| FEAT-310 | File Transcription panel (upload + path + formats + refine + download) | P0 | in-progress | REQ-401 to REQ-408 |
+| FEAT-311 | Suffix Injection Prompts (configurable append-to-prompt checkboxes) | P0 | in-progress | REQ-409 to REQ-413 |
+
+## TEST COUNTS (Verified 2026-02-23)
 
 | Area | Count | Details |
 |------|-------|---------|
 | Backend | 103 | config:15, health:3, models:5, transcribe:3, websocket:6, integrations:20, refiner:6, refiner_api:12, refiner_providers:33 |
-| Frontend | 76 | useSettings:6, useWebSocket:9, TranscriptionDisplay:9, useActivation:21, SettingsPanel:7, ErrorDisplay:4, ModelProgress:3, RefinerSettings:11, TextComparison:6 |
-| **Total** | **179** | **0 failures** |
+| Frontend | 83 | useSettings:6, useWebSocket:9, TranscriptionDisplay:9, useActivation:21, SettingsPanel:7, ErrorDisplay:4, ModelProgress:3, RefinerSettings:10, TextComparison:6, QuickControlsSidebar:8 |
+| **Total** | **186** | **0 failures** |
 
 ## LESSONS LEARNED (PROJECT-SPECIFIC)
 
@@ -244,6 +251,10 @@ User-selectable: tiny, base, small, medium, large-v3
 | 14 | HistorySidebar left panel layout | Claude Desktop-style, always-visible history | - | 2026-02-19 |
 | 15 | edge-tts for discuss mode TTS | Free, no API key, good voice quality | - | 2026-02-19 |
 | 16 | Conversation history in discuss mode | Frontend tracks and sends history, backend builds full message array | - | 2026-02-19 |
+| 17 | File transcription as separate tab | Clean separation from live recording UX | - | 2026-02-23 |
+| 18 | Suffix injections as frontend-only feature | Injections arrive at backend as part of custom_prompt | - | 2026-02-23 |
+| 19 | AHK v2 tray icon (no pystray) | pystray must run as Windows process; AHK already is | - | 2026-02-23 |
+| 20 | ttyd port guard in Chrome ext | Prevent false-positive on non-ttyd xterm.js pages | - | 2026-02-23 |
 
 ## DOCUMENTS
 
@@ -256,6 +267,9 @@ User-selectable: tiny, base, small, medium, large-v3
 | ADD-002 (v1.1 Architecture) | docs/add/ADD-002-v1.1-text-refinement.md | Needs update (missing .env, new providers) |
 | ADD-003 (v1.3 Architecture) | TBD | Not yet created |
 | Test Strategy | docs/test-strategy/TEST-STRATEGY-001.md | Current |
+| PRD-004 (v1.4 File Transcription) | docs/prd/PRD-004-v1.4-file-transcription.md | Draft |
+| ADD-004 (v1.4 Architecture) | docs/add/ADD-004-v1.4-file-transcription.md | Draft |
+| TEST-STRATEGY-003 (v1.4) | docs/test-strategy/TEST-STRATEGY-003-v1.4.md | Draft |
 | Versioning Plan | docs/plans/PLAN-VERSIONING-STRATEGY-20260216.md | Approved |
 
 ## RECOVERY PROTOCOL (READ AFTER COMPACTION)

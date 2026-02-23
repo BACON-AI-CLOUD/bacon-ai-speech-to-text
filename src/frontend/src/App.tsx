@@ -13,6 +13,7 @@ import { QuickControlsSidebar } from './components/QuickControlsSidebar.tsx';
 import { SettingsPanel } from './components/SettingsPanel.tsx';
 import { ErrorDisplay } from './components/ErrorDisplay.tsx';
 import { ModelProgress } from './components/ModelProgress.tsx';
+import { FileTranscriptionPanel } from './components/FileTranscriptionPanel.tsx';
 import { playCountdownBeeps, playBeep, warmUpAudio } from './utils/beep.ts';
 import { playAnnouncement } from './utils/announce.ts';
 import type { ModelDownloadProgress, RefinerResult, DiscussResult, TranscriptionResult } from './types/index.ts';
@@ -48,6 +49,7 @@ function App() {
   const [discussError, setDiscussError] = useState<string | null>(null);
   const [history, setHistory] = useState<TranscriptionResult[]>([]);
   const [discussHistory, setDiscussHistory] = useState<Array<{ role: string; content: string }>>([]);
+  const [activeTab, setActiveTab] = useState<'live' | 'file'>('live');
   // Ref mirrors state so the discuss effect always reads the latest history (avoids stale closure race)
   const discussHistoryRef = useRef<Array<{ role: string; content: string }>>([]);
 
@@ -180,11 +182,12 @@ function App() {
   // Cursor position mode: play countdown beeps (or Elisabeth voice) before mic starts
   // so user can switch to target app / position cursor before speaking.
   const handleBeepsForCursorMode = useCallback(async () => {
+    const httpUrl = settings.backendUrl.replace('ws://', 'http://').replace('wss://', 'https://');
     if (settings.announcementMode === 'voice') {
-      const httpUrl = settings.backendUrl.replace('ws://', 'http://').replace('wss://', 'https://');
       await playAnnouncement(httpUrl, settings.startMessage, settings.discussVoice);
-    } else {
-      if (settings.countdownBeeps === 0) return;
+    }
+    // After announcement (or in beep-only mode), play countdown beeps as "go" signal
+    if (settings.countdownBeeps > 0) {
       countdownInProgressRef.current = true;
       await playCountdownBeeps(
         {
@@ -502,10 +505,12 @@ function App() {
       triggerStop();
     } else if (recordingState === 'idle' && !countdownInProgressRef.current) {
       countdownInProgressRef.current = true;
+      const httpUrl = settings.backendUrl.replace('ws://', 'http://').replace('wss://', 'https://');
       if (settings.announcementMode === 'voice') {
-        const httpUrl = settings.backendUrl.replace('ws://', 'http://').replace('wss://', 'https://');
         await playAnnouncement(httpUrl, settings.startMessage, settings.discussVoice);
-      } else {
+      }
+      // After announcement (or in beep-only mode), play countdown beeps as "go" signal
+      if (settings.countdownBeeps > 0) {
         await playCountdownBeeps(
           {
             count: settings.countdownBeeps,
@@ -540,6 +545,14 @@ function App() {
   const handleRetry = useCallback(() => {
     connect();
   }, [connect]);
+
+  // On first load in PWA standalone mode, resize to a portrait-friendly size.
+  useEffect(() => {
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+    if (isStandalone) {
+      try { window.resizeTo(480, 700); } catch { /* ignored in regular tabs */ }
+    }
+  }, []);
 
   // Mini mode window resize: shrink the browser window to fit the widget,
   // restore on exit. Works in PWA / "Open as window" mode; silently ignored in tabs.
@@ -615,7 +628,7 @@ function App() {
           <img src="/bacon-ai-logo-black.png" alt="B" className="app-logo" />
           <div className="app-brand-text">
             <h1 className="app-title">ACON-AI</h1>
-            <span className="app-subtitle">SPEECH-TO-TEXT</span>
+            <span className="app-subtitle">SPEECH-TO-TEXT <span style={{ fontSize: '10px', opacity: 0.45, letterSpacing: '0.05em' }}>v{__APP_VERSION__}</span></span>
           </div>
         </div>
         <div className="app-header__right">
@@ -668,46 +681,72 @@ function App() {
         />
 
         <div className="app-content">
-          <AudioCapture
-            recordingState={recordingState}
-            activationMode={settings.activationMode}
-            onToggle={handleToggle}
-            permissionState={permissionState}
-            hotkey={settings.hotkey}
-            audioLevel={audioLevel}
-          />
+          <div className="tab-switcher">
+            <button
+              className={activeTab === 'live' ? 'tab-btn tab-btn--active' : 'tab-btn'}
+              onClick={() => setActiveTab('live')}
+            >
+              Live
+            </button>
+            <button
+              className={activeTab === 'file' ? 'tab-btn tab-btn--active' : 'tab-btn'}
+              onClick={() => setActiveTab('file')}
+            >
+              File
+            </button>
+          </div>
 
-          <WaveformVisualizer
-            audioStream={audioStream}
-            isRecording={recordingState === 'recording'}
-          />
+          {activeTab === 'live' && (
+            <>
+              <AudioCapture
+                recordingState={recordingState}
+                activationMode={settings.activationMode}
+                onToggle={handleToggle}
+                permissionState={permissionState}
+                hotkey={settings.hotkey}
+                audioLevel={audioLevel}
+              />
 
-          <ModelProgress progress={modelProgress} />
+              <WaveformVisualizer
+                audioStream={audioStream}
+                isRecording={recordingState === 'recording'}
+              />
 
-          <TranscriptionDisplay
-            lastResult={lastResult}
-            notificationsEnabled={settings.notificationsEnabled}
-            autoCopy={settings.autoCopy}
-            typeToKeyboard={settings.typeToKeyboard}
-            typingAutoFocus={settings.typingAutoFocus}
-            targetWindow={settings.targetWindow}
-            typingFocusDelay={settings.typingFocusDelay}
-            typingFlashWindow={settings.typingFlashWindow}
-            cursorPositionMode={settings.cursorPositionMode}
-            announcementMode={settings.announcementMode}
-            writeMessage={settings.writeMessage}
-            announcementVoice={settings.discussVoice}
-            backendUrl={settings.backendUrl}
-            refinerEnabled={settings.refiner.enabled}
-            refinerResult={refinerResult}
-            isRefining={isRefining}
-            refinerError={refinerError}
-            suppressActions={false}
-            discussResult={discussResult}
-            isDiscussing={isDiscussing}
-            discussError={discussError}
-            onHistoryUpdate={setHistory}
-          />
+              <ModelProgress progress={modelProgress} />
+
+              <TranscriptionDisplay
+                lastResult={lastResult}
+                notificationsEnabled={settings.notificationsEnabled}
+                autoCopy={settings.autoCopy}
+                typeToKeyboard={settings.typeToKeyboard}
+                typingAutoFocus={settings.typingAutoFocus}
+                targetWindow={settings.targetWindow}
+                typingFocusDelay={settings.typingFocusDelay}
+                typingFlashWindow={settings.typingFlashWindow}
+                cursorPositionMode={settings.cursorPositionMode}
+                announcementMode={settings.announcementMode}
+                writeMessage={settings.writeMessage}
+                announcementVoice={settings.discussVoice}
+                backendUrl={settings.backendUrl}
+                refinerEnabled={settings.refiner.enabled}
+                refinerResult={refinerResult}
+                isRefining={isRefining}
+                refinerError={refinerError}
+                suppressActions={false}
+                discussResult={discussResult}
+                isDiscussing={isDiscussing}
+                discussError={discussError}
+                onHistoryUpdate={setHistory}
+                suffixInjections={settings.suffixInjections}
+                injectOnLive={settings.injectOnLive}
+                injectOnKeyboard={settings.injectOnKeyboard}
+              />
+            </>
+          )}
+
+          {activeTab === 'file' && (
+            <FileTranscriptionPanel settings={settings} backendUrl={settings.backendUrl} />
+          )}
 
           <SettingsPanel
             settings={settings}

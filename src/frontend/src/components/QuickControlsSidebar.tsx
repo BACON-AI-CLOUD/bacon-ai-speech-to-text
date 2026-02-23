@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import type { AppSettings, ProviderInfo, ModelInfo, PromptTemplate, BuiltinPromptTemplate } from '../types/index.ts';
+import type { AppSettings, ProviderInfo, ModelInfo, PromptTemplate, BuiltinPromptTemplate, SuffixInjection } from '../types/index.ts';
 import { BUILTIN_TEMPLATES } from './RefinerSettings.tsx';
 import './QuickControlsSidebar.css';
 
@@ -11,7 +11,7 @@ interface QuickControlsSidebarProps {
   onToggle: () => void;
 }
 
-type SidebarTab = 'refiner' | 'output';
+type SidebarTab = 'refiner' | 'output' | 'inject';
 
 const FALLBACK_PROVIDERS: ProviderInfo[] = [
   { id: 'claude-cli', name: 'Claude Code', requires_api_key: false, configured: true },
@@ -239,6 +239,14 @@ export function QuickControlsSidebar({
             onClick={() => setActiveTab('output')}
           >
             Output
+          </button>
+          <button
+            className={`qcs-tab ${activeTab === 'inject' ? 'qcs-tab--active' : ''}`}
+            role="tab"
+            aria-selected={activeTab === 'inject'}
+            onClick={() => setActiveTab('inject')}
+          >
+            Inject
           </button>
         </div>
 
@@ -520,7 +528,130 @@ export function QuickControlsSidebar({
             </label>
           </div>
         )}
+
+        {/* Inject tab */}
+        {activeTab === 'inject' && (
+          <div className="qcs-body" role="tabpanel">
+            <div className="qcs-field">
+              <label className="qcs-label">Apply injections to:</label>
+              <label className="qcs-toggle-label">
+                <input type="checkbox" checked={settings.injectOnLive} onChange={(e) => onUpdate({ injectOnLive: e.target.checked })} />
+                <span>Live recording</span>
+              </label>
+              <label className="qcs-toggle-label">
+                <input type="checkbox" checked={settings.injectOnFile} onChange={(e) => onUpdate({ injectOnFile: e.target.checked })} />
+                <span>File transcription</span>
+              </label>
+              <label className="qcs-toggle-label">
+                <input type="checkbox" checked={settings.injectOnKeyboard} onChange={(e) => onUpdate({ injectOnKeyboard: e.target.checked })} />
+                <span>Keyboard typing</span>
+              </label>
+            </div>
+
+            <div className="qcs-field" style={{ marginTop: '8px' }}>
+              <label className="qcs-label">Suffix injections</label>
+              <div className="qcs-inject-list">
+                {settings.suffixInjections.map((inj) => (
+                  <div key={inj.id} className="qcs-inject-item">
+                    <label className="qcs-toggle-label" style={{ flex: 1 }}>
+                      <input
+                        type="checkbox"
+                        checked={inj.enabled}
+                        onChange={(e) => {
+                          const updated = settings.suffixInjections.map((i) =>
+                            i.id === inj.id ? { ...i, enabled: e.target.checked } : i,
+                          );
+                          onUpdate({ suffixInjections: updated });
+                        }}
+                      />
+                      <span style={{ fontSize: '12px' }}>{inj.label}</span>
+                    </label>
+                    {!inj.builtIn && (
+                      <button
+                        className="qcs-inject-delete"
+                        onClick={() => {
+                          const updated = settings.suffixInjections.filter((i) => i.id !== inj.id);
+                          onUpdate({ suffixInjections: updated });
+                        }}
+                        title="Remove injection"
+                      >
+                        x
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <AddCustomInjection
+              onAdd={(label, text) => {
+                const newInj: SuffixInjection = {
+                  id: `custom-${Date.now()}`,
+                  label,
+                  text,
+                  enabled: true,
+                  builtIn: false,
+                };
+                onUpdate({ suffixInjections: [...settings.suffixInjections, newInj] });
+              }}
+            />
+
+            <div className="qcs-field" style={{ marginTop: '8px' }}>
+              <button
+                className="qcs-btn-small"
+                title="Load target window set by Win+Shift+B hotkey"
+                onClick={async () => {
+                  try {
+                    const resp = await fetch(`${httpUrl}/keyboard/target`);
+                    const data = await resp.json();
+                    if (data.target) onUpdate({ targetWindow: data.target });
+                  } catch { /* ignored */ }
+                }}
+              >
+                Load AHK target
+              </button>
+            </div>
+          </div>
+        )}
       </aside>
     </>
+  );
+}
+
+function AddCustomInjection({ onAdd }: { onAdd: (label: string, text: string) => void }) {
+  const [label, setLabel] = useState('');
+  const [text, setText] = useState('');
+
+  const handleAdd = () => {
+    if (!label.trim() || !text.trim()) return;
+    onAdd(label.trim(), text.trim());
+    setLabel('');
+    setText('');
+  };
+
+  return (
+    <div className="qcs-add-injection">
+      <input
+        className="qcs-input"
+        type="text"
+        value={label}
+        onChange={(e) => setLabel(e.target.value)}
+        placeholder="Label"
+      />
+      <textarea
+        className="qcs-input qcs-textarea"
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        placeholder="Injection text..."
+        rows={2}
+      />
+      <button
+        className="qcs-btn-small"
+        onClick={handleAdd}
+        disabled={!label.trim() || !text.trim()}
+      >
+        + Add
+      </button>
+    </div>
   );
 }

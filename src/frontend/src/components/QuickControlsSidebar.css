@@ -226,6 +226,73 @@
   cursor: not-allowed;
 }
 
+/* Inject tab */
+.qcs-inject-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.qcs-inject-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.qcs-inject-delete {
+  background: none;
+  border: none;
+  color: #666;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.qcs-inject-delete:hover {
+  color: #e06060;
+  background: rgba(200, 50, 50, 0.1);
+}
+
+.qcs-add-injection {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #1e1e3a;
+}
+
+.qcs-textarea {
+  resize: vertical;
+  min-height: 36px;
+  font-size: 0.78rem;
+}
+
+.qcs-btn-small {
+  background: #1a1a2e;
+  border: 1px solid #2a2a4e;
+  border-radius: 6px;
+  color: #b0b0c8;
+  font-size: 0.78rem;
+  padding: 5px 10px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.qcs-btn-small:hover:not(:disabled) {
+  background: #22223a;
+  color: #e0e0f0;
+}
+
+.qcs-btn-small:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 /* Scrollbar styling */
 .qcs-body::-webkit-scrollbar {
   width: 4px;

@@ -92,6 +92,39 @@
   border-top: 1px solid #1a1a2e;
 }
 
+/* Tab switcher (Live / File) */
+.tab-switcher {
+  display: flex;
+  gap: 4px;
+  background: #12121e;
+  border-radius: 8px;
+  padding: 3px;
+  margin-bottom: 12px;
+  align-self: center;
+  width: fit-content;
+}
+
+.tab-btn {
+  padding: 6px 18px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #888;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: background 0.15s, color 0.15s;
+}
+
+.tab-btn:hover {
+  color: #ccc;
+}
+
+.tab-btn--active {
+  background: #1e1e36;
+  color: #e0e0f0;
+}
+
 /* Countdown overlay */
 .countdown-overlay {
   position: fixed;

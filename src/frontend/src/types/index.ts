@@ -64,6 +64,10 @@ export interface AppSettings {
   refiner: RefinerConfig;
   discussMode: boolean;
   discussVoice: string;
+  suffixInjections: SuffixInjection[];
+  injectOnLive: boolean;
+  injectOnFile: boolean;
+  injectOnKeyboard: boolean;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -102,6 +106,81 @@ export const DEFAULT_SETTINGS: AppSettings = {
   },
   discussMode: false,
   discussVoice: 'en-GB-SoniaNeural',
+  suffixInjections: [
+    {
+      id: 'bacon-docs',
+      label: 'BACON docs reminder',
+      text: "Don't forget to create PRDs, ADD, test scripts per BACON directives and verify they're in the plan.",
+      enabled: false,
+      builtIn: true
+    },
+    {
+      id: 'action-items',
+      label: 'Extract action items',
+      text: 'Extract all action items with owners and suggested due dates.',
+      enabled: false,
+      builtIn: true
+    },
+    {
+      id: 'bullet-summary',
+      label: '3-bullet summary',
+      text: 'Summarise in exactly 3 bullet points for an executive briefing.',
+      enabled: false,
+      builtIn: true
+    },
+    {
+      id: 'open-questions',
+      label: 'Open questions & blockers',
+      text: 'List all open questions and blockers identified above.',
+      enabled: false,
+      builtIn: true
+    },
+    {
+      id: 'linear-issue',
+      label: 'Linear issue format',
+      text: 'Format as a Linear issue: concise title + detailed description.',
+      enabled: false,
+      builtIn: true
+    },
+    {
+      id: 'key-decisions',
+      label: 'Key decisions + rationale',
+      text: 'Extract all key decisions made and document each with its rationale.',
+      enabled: false,
+      builtIn: true
+    },
+    {
+      id: 'follow-up-email',
+      label: 'Follow-up email draft',
+      text: 'Draft a professional follow-up email from the above content.',
+      enabled: false,
+      builtIn: true
+    },
+    {
+      id: 'tech-stack',
+      label: 'Tech & tools mentioned',
+      text: 'List all technologies, tools, APIs and systems mentioned or implied.',
+      enabled: false,
+      builtIn: true
+    },
+    {
+      id: 'git-commit',
+      label: 'Git commit message',
+      text: 'Write git commit message(s) in conventional commit format for the changes discussed.',
+      enabled: false,
+      builtIn: true
+    },
+    {
+      id: 'security-check',
+      label: 'Security & privacy check',
+      text: 'Identify any security, privacy, or compliance concerns in the above.',
+      enabled: false,
+      builtIn: true
+    }
+  ],
+  injectOnLive: false,
+  injectOnFile: true,
+  injectOnKeyboard: false,
 };
 
 export type BuiltinPromptTemplate = 'cleanup' | 'nudge' | 'governance' | 'professional' | 'email' | 'whatsapp' | 'technical' | 'personal' | 'sheets-tsv' | 'sheets-script' | 'custom';
@@ -142,6 +221,14 @@ export interface RefinerResult {
   processing_time_ms: number;
   tokens_used: number;
   warning?: string;
+}
+
+export interface SuffixInjection {
+  id: string;
+  label: string;
+  text: string;
+  enabled: boolean;
+  builtIn: boolean;
 }
 
 export interface DiscussResult {

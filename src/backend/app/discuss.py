@@ -34,7 +34,7 @@ DISCUSS_SYSTEM_PROMPT = (
 )
 
 # Valid filename pattern: alphanumeric + hyphens + .mp3
-_FILENAME_RE = re.compile(r"^[a-zA-Z0-9\-]+\.mp3$")
+_FILENAME_RE = re.compile(r"^[a-zA-Z0-9\-_]+\.mp3$")
 
 
 def _cleanup_old_audio() -> None:

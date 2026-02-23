@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import type { TranscriptionResult, RefinerResult, DiscussResult } from '../types/index.ts';
+import type { TranscriptionResult, RefinerResult, DiscussResult, SuffixInjection } from '../types/index.ts';
 import { TextComparison } from './TextComparison.tsx';
 import { playAnnouncement } from '../utils/announce.ts';
+import { buildTextWithInjections } from '../utils/buildTextWithInjections.ts';
 import './TranscriptionDisplay.css';
 
 interface TranscriptionDisplayProps {
@@ -27,6 +28,9 @@ interface TranscriptionDisplayProps {
   isDiscussing?: boolean;
   discussError?: string | null;
   onHistoryUpdate?: (updater: React.SetStateAction<TranscriptionResult[]>) => void;
+  suffixInjections?: SuffixInjection[];
+  injectOnLive?: boolean;
+  injectOnKeyboard?: boolean;
 }
 
 function confidenceBadgeClass(confidence: number): string {
@@ -69,6 +73,9 @@ export function TranscriptionDisplay({
   isDiscussing = false,
   discussError = null,
   onHistoryUpdate,
+  suffixInjections = [],
+  injectOnLive = false,
+  injectOnKeyboard = false,
 }: TranscriptionDisplayProps) {
   const [editText, setEditText] = useState('');
   const [copied, setCopied] = useState(false);
@@ -101,8 +108,15 @@ export function TranscriptionDisplay({
       // Refiner disabled: dispatch actions immediately with raw text
       actionsDispatchedRef.current = lastResult.text;
 
+      const textForCopy = injectOnLive
+        ? buildTextWithInjections(lastResult.text, suffixInjections)
+        : lastResult.text;
+      const textForKeyboard = injectOnLive && injectOnKeyboard
+        ? buildTextWithInjections(lastResult.text, suffixInjections)
+        : lastResult.text;
+
       if (autoCopy && navigator.clipboard) {
-        navigator.clipboard.writeText(lastResult.text).catch(() => {});
+        navigator.clipboard.writeText(textForCopy).catch(() => {});
       }
 
       if (typeToKeyboard) {
@@ -117,7 +131,7 @@ export function TranscriptionDisplay({
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              text: lastResult.text,
+              text: textForKeyboard,
               auto_focus: cursorPositionMode ? false : typingAutoFocus,
               target_window: cursorPositionMode ? undefined : (targetWindow || undefined),
               focus_delay_ms: typingFocusDelay,
@@ -134,7 +148,7 @@ export function TranscriptionDisplay({
         });
       }
     }
-  }, [lastResult, autoCopy, notificationsEnabled, typeToKeyboard, typingAutoFocus, targetWindow, typingFocusDelay, typingFlashWindow, cursorPositionMode, announcementMode, writeMessage, announcementVoice, backendUrl, suppressActions, refinerEnabled, onHistoryUpdate]);
+  }, [lastResult, autoCopy, notificationsEnabled, typeToKeyboard, typingAutoFocus, targetWindow, typingFocusDelay, typingFlashWindow, cursorPositionMode, announcementMode, writeMessage, announcementVoice, backendUrl, suppressActions, refinerEnabled, onHistoryUpdate, suffixInjections, injectOnLive, injectOnKeyboard]);
 
   // When refiner is enabled, dispatch actions after refined text arrives
   useEffect(() => {
@@ -146,8 +160,15 @@ export function TranscriptionDisplay({
     if (actionsDispatchedRef.current === outputText) return;
     actionsDispatchedRef.current = outputText;
 
+    const textForCopy = injectOnLive
+      ? buildTextWithInjections(outputText, suffixInjections)
+      : outputText;
+    const textForKeyboard = injectOnLive && injectOnKeyboard
+      ? buildTextWithInjections(outputText, suffixInjections)
+      : outputText;
+
     if (autoCopy && navigator.clipboard) {
-      navigator.clipboard.writeText(outputText).catch(() => {});
+      navigator.clipboard.writeText(textForCopy).catch(() => {});
     }
 
     if (typeToKeyboard) {
@@ -162,7 +183,7 @@ export function TranscriptionDisplay({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            text: outputText,
+            text: textForKeyboard,
             auto_focus: cursorPositionMode ? false : typingAutoFocus,
             target_window: cursorPositionMode ? undefined : (targetWindow || undefined),
             focus_delay_ms: typingFocusDelay,
@@ -178,7 +199,7 @@ export function TranscriptionDisplay({
         tag: 'bacon-voice-transcription',
       });
     }
-  }, [refinerEnabled, refinerResult, suppressActions, autoCopy, typeToKeyboard, notificationsEnabled, typingAutoFocus, targetWindow, cursorPositionMode, announcementMode, writeMessage, announcementVoice, backendUrl, lastResult]);
+  }, [refinerEnabled, refinerResult, suppressActions, autoCopy, typeToKeyboard, notificationsEnabled, typingAutoFocus, targetWindow, cursorPositionMode, announcementMode, writeMessage, announcementVoice, backendUrl, lastResult, suffixInjections, injectOnLive, injectOnKeyboard]);
 
   const handleCopy = useCallback(async () => {
     try {

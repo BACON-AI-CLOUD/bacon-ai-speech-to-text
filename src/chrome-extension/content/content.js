@@ -25,13 +25,15 @@ let config = {
   shortcut: 'Ctrl+Shift+M',
   silenceMs: 3000,
   model: 'base',
+  ttydPort: 7681,
 };
 
-chrome.storage.sync.get(['port', 'shortcut', 'silenceMs', 'model'], (stored) => {
+chrome.storage.sync.get(['port', 'shortcut', 'silenceMs', 'model', 'ttydPort'], (stored) => {
   if (stored.port) config.port = stored.port;
   if (stored.shortcut) config.shortcut = stored.shortcut;
   if (stored.silenceMs) config.silenceMs = stored.silenceMs;
   if (stored.model) config.model = stored.model;
+  if (stored.ttydPort) config.ttydPort = stored.ttydPort;
 });
 
 chrome.storage.onChanged.addListener((changes) => {
@@ -39,6 +41,7 @@ chrome.storage.onChanged.addListener((changes) => {
   if (changes.shortcut) config.shortcut = changes.shortcut.newValue;
   if (changes.silenceMs) config.silenceMs = changes.silenceMs.newValue;
   if (changes.model) config.model = changes.model.newValue;
+  if (changes.ttydPort) config.ttydPort = changes.ttydPort.newValue;
 });
 
 // ─── Overlay UI ──────────────────────────────────────────────────────────────
@@ -87,6 +90,36 @@ function parseEmailText(text) {
 
 // ─── Text Insertion ───────────────────────────────────────────────────────────
 async function insertTextAtCursor(text) {
+  // ── xterm.js / ttyd terminal injection ──────────────────────────────────────
+  const isLocalhost = window.location.hostname === 'localhost' ||
+                      window.location.hostname === '127.0.0.1';
+  const isTtydPort = isLocalhost &&
+                     (window.location.port === String(config.ttydPort || 7681));
+  if (isTtydPort) {
+    // Strategy 1: xterm.js Terminal.paste() API (ttyd exposes window.term)
+    if (typeof window.term !== 'undefined' && typeof window.term.paste === 'function') {
+      window.term.paste(text);
+      showOverlay('\u2713 Sent to terminal');
+      return;
+    }
+    // Strategy 2: xterm.js hidden helper textarea
+    const xtermTA = document.querySelector('textarea.xterm-helper-textarea');
+    if (xtermTA) {
+      xtermTA.focus();
+      const pos = xtermTA.selectionStart ?? xtermTA.value.length;
+      xtermTA.setRangeText(text, pos, pos, 'end');
+      xtermTA.dispatchEvent(new Event('input', { bubbles: true }));
+      showOverlay('\u2713 Sent to terminal');
+      return;
+    }
+    // Strategy 3: clipboard fallback with notification
+    if (navigator.clipboard) {
+      await navigator.clipboard.writeText(text);
+      showOverlay('Copied (paste with Ctrl+Shift+V in terminal)');
+      return;
+    }
+  }
+
   // ── Gmail smart insert ──────────────────────────────────────────────────────
   if (window.location.hostname === 'mail.google.com') {
     const gmail = detectGmailCompose();
