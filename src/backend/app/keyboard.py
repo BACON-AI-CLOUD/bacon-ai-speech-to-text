@@ -264,16 +264,18 @@ class KeyboardEmulator:
             if self.tool == "sendkeys":
                 result = subprocess.run(
                     [
-                        "powershell.exe", "-c",
+                        "powershell.exe", "-NoProfile", "-c",
+                        "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; "
                         "Get-Process | Where-Object { $_.MainWindowTitle -ne '' -and $_.MainWindowHandle -ne 0 } "
                         "| Select-Object ProcessName, MainWindowTitle "
                         "| ForEach-Object { $_.ProcessName + '|' + $_.MainWindowTitle }"
                     ],
-                    capture_output=True, text=True, timeout=5,
+                    capture_output=True, timeout=15,
                 )
+                output = result.stdout.decode("utf-8", errors="replace")
                 windows = []
                 seen = set()
-                for line in result.stdout.strip().split("\n"):
+                for line in output.strip().split("\n"):
                     line = line.strip()
                     if not line or "|" not in line:
                         continue

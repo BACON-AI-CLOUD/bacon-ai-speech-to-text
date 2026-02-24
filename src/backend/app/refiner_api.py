@@ -138,11 +138,17 @@ async def process_text(request: RefineRequest) -> Dict[str, Any]:
         )
 
     refiner = get_refiner()
-    result = await refiner.process(
-        request.text,
-        provider_override=request.provider,
-        prompt_override=request.custom_prompt or None,
-    )
+    # Force-enable for explicit refine calls (user intent is clear regardless of global toggle)
+    was_enabled = refiner._enabled
+    refiner._enabled = True
+    try:
+        result = await refiner.process(
+            request.text,
+            provider_override=request.provider,
+            prompt_override=request.custom_prompt or None,
+        )
+    finally:
+        refiner._enabled = was_enabled
 
     response = {
         "refined_text": result.refined_text,

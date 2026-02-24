@@ -155,6 +155,8 @@ export function TextEditorPanel({ settings, backendUrl }: TextEditorPanelProps) 
     if (!text.trim()) return;
     setRefining(true);
     setError(null);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 120_000);
     try {
       const resp = await fetch(`${httpUrl}/refiner/process`, {
         method: 'POST',
@@ -163,6 +165,7 @@ export function TextEditorPanel({ settings, backendUrl }: TextEditorPanelProps) 
           text,
           ...(settings.refiner.customPrompt ? { custom_prompt: settings.refiner.customPrompt } : {}),
         }),
+        signal: controller.signal,
       });
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({ detail: 'Refinement failed' }));
@@ -171,8 +174,13 @@ export function TextEditorPanel({ settings, backendUrl }: TextEditorPanelProps) 
       const data = await resp.json();
       setRefinedText(data.refined_text);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Refinement failed');
+      if (e instanceof DOMException && e.name === 'AbortError') {
+        setError('Refinement timed out after 2 minutes. Check that your AI provider is running.');
+      } else {
+        setError(e instanceof Error ? e.message : 'Refinement failed');
+      }
     } finally {
+      clearTimeout(timeoutId);
       setRefining(false);
     }
   }, [text, httpUrl, settings.refiner.customPrompt]);
@@ -190,10 +198,16 @@ export function TextEditorPanel({ settings, backendUrl }: TextEditorPanelProps) 
       await fetch(`${httpUrl}/keyboard/type`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: textToType }),
+        body: JSON.stringify({
+          text: textToType,
+          auto_focus: settings.cursorPositionMode ? false : settings.typingAutoFocus,
+          target_window: settings.cursorPositionMode ? undefined : (settings.targetWindow || undefined),
+          focus_delay_ms: settings.typingFocusDelay,
+          flash_window: settings.cursorPositionMode ? false : settings.typingFlashWindow,
+        }),
       });
     } catch { /* ignore */ }
-  }, [httpUrl]);
+  }, [httpUrl, settings.cursorPositionMode, settings.typingAutoFocus, settings.targetWindow, settings.typingFocusDelay, settings.typingFlashWindow]);
 
   const charCount = text.length;
   const wordCount = text.trim() ? text.trim().split(/\s+/).length : 0;
