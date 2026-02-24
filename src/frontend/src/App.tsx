@@ -14,6 +14,7 @@ import { SettingsPanel } from './components/SettingsPanel.tsx';
 import { ErrorDisplay } from './components/ErrorDisplay.tsx';
 import { ModelProgress } from './components/ModelProgress.tsx';
 import { FileTranscriptionPanel } from './components/FileTranscriptionPanel.tsx';
+import { TextEditorPanel } from './components/TextEditorPanel.tsx';
 import { playCountdownBeeps, playBeep, warmUpAudio } from './utils/beep.ts';
 import { playAnnouncement } from './utils/announce.ts';
 import type { ModelDownloadProgress, RefinerResult, DiscussResult, TranscriptionResult } from './types/index.ts';
@@ -49,7 +50,7 @@ function App() {
   const [discussError, setDiscussError] = useState<string | null>(null);
   const [history, setHistory] = useState<TranscriptionResult[]>([]);
   const [discussHistory, setDiscussHistory] = useState<Array<{ role: string; content: string }>>([]);
-  const [activeTab, setActiveTab] = useState<'live' | 'file'>('live');
+  const [activeTab, setActiveTab] = useState<'live' | 'file' | 'text'>('live');
   // Ref mirrors state so the discuss effect always reads the latest history (avoids stale closure race)
   const discussHistoryRef = useRef<Array<{ role: string; content: string }>>([]);
 
@@ -694,6 +695,12 @@ function App() {
             >
               File
             </button>
+            <button
+              className={activeTab === 'text' ? 'tab-btn tab-btn--active' : 'tab-btn'}
+              onClick={() => setActiveTab('text')}
+            >
+              Text
+            </button>
           </div>
 
           {activeTab === 'live' && (
@@ -746,6 +753,10 @@ function App() {
 
           {activeTab === 'file' && (
             <FileTranscriptionPanel settings={settings} backendUrl={settings.backendUrl} />
+          )}
+
+          {activeTab === 'text' && (
+            <TextEditorPanel settings={settings} backendUrl={settings.backendUrl} />
           )}
 
           <SettingsPanel
