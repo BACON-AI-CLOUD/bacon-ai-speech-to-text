@@ -100,9 +100,13 @@ export function QuickControlsSidebar({
     setLoadingWindows(false);
   }, [httpUrl]);
 
-  // Fetch windows once on first open
+  // Fetch windows every time the panel opens
   useEffect(() => {
-    if (!isOpen || fetchedWindowsRef.current) return;
+    if (!isOpen) {
+      fetchedWindowsRef.current = false;
+      return;
+    }
+    if (fetchedWindowsRef.current) return;
     fetchedWindowsRef.current = true;
     fetchWindows();
   }, [isOpen, fetchWindows]);
