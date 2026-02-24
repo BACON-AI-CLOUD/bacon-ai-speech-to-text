@@ -18,14 +18,14 @@
 
 | Field | Value |
 |-------|-------|
-| **Current Phase** | v1.4 File Transcription + Suffix Injections |
+| **Current Phase** | v1.5 Document & Text Processing |
 | **Phase Status** | in-progress |
-| **Active Features** | FEAT-310 (File Transcription), FEAT-311 (Suffix Injections) |
+| **Active Features** | FEAT-312..317 + BUGFIX-001 |
 | **Active Branch** | feature/v1.4-file-transcription |
-| **Last Action** | v1.4 implementation complete - all agents done |
-| **Next Step** | UAT - test file transcription and suffix injections in browser |
+| **Last Action** | v1.5 implementation complete (5 agents, 4 commits) - all 186 tests pass |
+| **Next Step** | UAT - test File tab (Select File + URL/YouTube), Text Editor tab, editable results, Markdown template |
 | **Blockers** | None |
-| **Last Updated** | 2026-02-23 by orchestrator |
+| **Last Updated** | 2026-02-24 by orchestrator |
 
 ## YOUR ROLE: ORCHESTRATOR
 
@@ -203,20 +203,34 @@ User-selectable: tiny, base, small, medium, large-v3
 | FEAT-308 | Mini-button collapse | P1 | planned | REQ-315-316 |
 | FEAT-309 | History persistence + project grouping | P0 | planned | REQ-317-320 |
 
-### v1.4 Features (IN PROGRESS - feature/v1.4-file-transcription)
+### v1.5 Features (IN PROGRESS - feature/v1.4-file-transcription)
+
+| Feature ID | Title | Priority | Status | Notes |
+|-----------|-------|----------|--------|-------|
+| FEAT-312 | File tab UX: unified Select File + drag-drop + URL input field | P0 | completed | Removes Upload/Local-path toggle; YouTube badge detection |
+| FEAT-313 | URL + YouTube transcription (yt-dlp backend) | P0 | completed | POST /transcribe/file/url; reuses Whisper pipeline |
+| FEAT-314 | Text Editor tab (load/save/clear/preview/refine/copy/type) | P1 | completed | .txt/.md client-side; .pdf/.docx via /extract-text/upload |
+| FEAT-315 | Document text extraction backend (.pdf, .docx) | P1 | completed | POST /extract-text/upload; pypdf + python-docx |
+| FEAT-316 | Markdown → Clean Doc refiner template | P1 | completed | Added to BUILTIN_TEMPLATES + TEMPLATE_LABELS |
+| FEAT-317 | Editable refined text (Live tab + File tab) | P0 | completed | editedRefined textarea; Copy/Type uses edited version |
+| BUGFIX-001 | Target Window dropdown always empty on first open | — | completed | fetchedWindowsRef reset on panel close → re-fetches on open |
+
+### v1.4 Features (COMPLETE - feature/v1.4-file-transcription)
 
 | Feature ID | Title | Priority | Status | PRD Ref |
 |-----------|-------|----------|--------|---------|
 | FEAT-310 | File Transcription panel (upload + path + formats + refine + download) | P0 | in-progress | REQ-401 to REQ-408 |
 | FEAT-311 | Suffix Injection Prompts (configurable append-to-prompt checkboxes) | P0 | in-progress | REQ-409 to REQ-413 |
 
-## TEST COUNTS (Verified 2026-02-23)
+## TEST COUNTS (Verified 2026-02-24)
 
 | Area | Count | Details |
 |------|-------|---------|
 | Backend | 103 | config:15, health:3, models:5, transcribe:3, websocket:6, integrations:20, refiner:6, refiner_api:12, refiner_providers:33 |
 | Frontend | 83 | useSettings:6, useWebSocket:9, TranscriptionDisplay:9, useActivation:21, SettingsPanel:7, ErrorDisplay:4, ModelProgress:3, RefinerSettings:10, TextComparison:6, QuickControlsSidebar:8 |
 | **Total** | **186** | **0 failures** |
+
+_Note: v1.5 added no new test files (new components are integration-tested via UAT)._
 
 ## LESSONS LEARNED (PROJECT-SPECIFIC)
 
