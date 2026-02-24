@@ -58,12 +58,16 @@ const LANGUAGES = [
   { code: 'ar', label: 'Arabic' },
 ];
 
+function isYouTubeUrl(url: string): boolean {
+  return url.includes('youtube.com') || url.includes('youtu.be');
+}
+
 export function FileTranscriptionPanel({ settings, backendUrl }: FileTranscriptionPanelProps) {
   const httpUrl = backendUrl.replace('ws://', 'http://').replace('wss://', 'https://');
 
-  const [inputMode, setInputMode] = useState<'upload' | 'path'>('upload');
-  const [filePath, setFilePath] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [fileUrl, setFileUrl] = useState('');
+  const [sourceType, setSourceType] = useState<'file' | 'url'>('file');
   const [language, setLanguage] = useState('');
   const [outputFormat, setOutputFormat] = useState<'txt' | 'srt' | 'vtt'>('txt');
   const [refine, setRefine] = useState(false);
@@ -74,6 +78,8 @@ export function FileTranscriptionPanel({ settings, backendUrl }: FileTranscripti
   const [copied, setCopied] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [msgIndex, setMsgIndex] = useState(0);
+  const [editedText, setEditedText] = useState('');
+  const [editedRefined, setEditedRefined] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Rotate through fun messages while transcribing
@@ -101,19 +107,26 @@ export function FileTranscriptionPanel({ settings, backendUrl }: FileTranscripti
     const file = e.dataTransfer.files[0];
     if (file) {
       setSelectedFile(file);
-      setInputMode('upload');
+      setFileUrl('');
+      setSourceType('file');
     }
   }, []);
 
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] ?? null;
-    setSelectedFile(file);
+    if (file) {
+      setSelectedFile(file);
+      setFileUrl('');
+      setSourceType('file');
+    }
   }, []);
 
   const handleTranscribe = useCallback(async () => {
     setTranscribing(true);
     setError(null);
     setResult(null);
+    setEditedText('');
+    setEditedRefined('');
     try {
       let data: FileResult;
       let customPrompt = '';
@@ -124,7 +137,7 @@ export function FileTranscriptionPanel({ settings, backendUrl }: FileTranscripti
         }
       }
 
-      if (inputMode === 'upload' && selectedFile) {
+      if (sourceType === 'file' && selectedFile) {
         const formData = new FormData();
         formData.append('file', selectedFile);
         formData.append('language', language);
@@ -135,31 +148,41 @@ export function FileTranscriptionPanel({ settings, backendUrl }: FileTranscripti
           method: 'POST',
           body: formData,
         });
+        if (!resp.ok) {
+          const err = await resp.json().catch(() => ({ detail: 'Upload failed' }));
+          throw new Error(err.detail || 'Upload failed');
+        }
         data = await resp.json();
-      } else if (inputMode === 'path' && filePath) {
-        const resp = await fetch(`${httpUrl}/transcribe/file/path`, {
+      } else if (sourceType === 'url' && fileUrl) {
+        const resp = await fetch(`${httpUrl}/transcribe/file/url`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            path: filePath,
+            url: fileUrl,
             language,
             output_format: outputFormat,
             refine,
             custom_prompt: customPrompt || undefined,
           }),
         });
+        if (!resp.ok) {
+          const err = await resp.json().catch(() => ({ detail: 'URL transcription failed' }));
+          throw new Error(err.detail || 'URL transcription failed');
+        }
         data = await resp.json();
       } else {
-        throw new Error(inputMode === 'upload' ? 'Please select a file' : 'Please enter a file path');
+        throw new Error('Please select a file or enter a URL');
       }
       if (data.error) throw new Error(data.error);
       setResult(data);
+      setEditedText(data.text);
+      setEditedRefined(data.refined_text ?? '');
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Transcription failed');
     } finally {
       setTranscribing(false);
     }
-  }, [inputMode, selectedFile, filePath, language, outputFormat, refine, useInjections, settings.suffixInjections, httpUrl]);
+  }, [sourceType, selectedFile, fileUrl, language, outputFormat, refine, useInjections, settings.suffixInjections, httpUrl]);
 
   const handleCopy = useCallback(async (text: string) => {
     try {
@@ -169,65 +192,68 @@ export function FileTranscriptionPanel({ settings, backendUrl }: FileTranscripti
     } catch { /* clipboard unavailable */ }
   }, []);
 
-  const canTranscribe = inputMode === 'upload' ? !!selectedFile : !!filePath.trim();
+  const canTranscribe = sourceType === 'file' ? !!selectedFile : !!fileUrl.trim();
 
   return (
     <div className="file-panel">
-      {/* Mode switcher */}
-      <div className="mode-switcher">
-        <button
-          className={`mode-btn ${inputMode === 'upload' ? 'mode-btn--active' : ''}`}
-          onClick={() => setInputMode('upload')}
-        >
-          Upload file
-        </button>
-        <button
-          className={`mode-btn ${inputMode === 'path' ? 'mode-btn--active' : ''}`}
-          onClick={() => setInputMode('path')}
-        >
-          Local path
-        </button>
-      </div>
-
-      {/* File input area */}
-      {inputMode === 'upload' ? (
-        <div
-          className={`drop-zone ${dragging ? 'drop-zone--dragging' : ''}`}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-          onClick={() => fileInputRef.current?.click()}
-        >
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="audio/*,video/*,.wav,.mp3,.mp4,.webm,.ogg,.flac,.m4a,.aac,.mkv,.avi,.mov,.wma"
-            onChange={handleFileSelect}
-            style={{ display: 'none' }}
-          />
+      {/* Unified source area */}
+      <div
+        className={`source-area ${dragging ? 'source-area--dragging' : ''}`}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="audio/*,video/*,.wav,.mp3,.mp4,.webm,.ogg,.flac,.m4a,.aac,.mkv,.avi,.mov,.wma"
+          onChange={handleFileSelect}
+          style={{ display: 'none' }}
+        />
+        <div className="source-area__file-row">
+          <button
+            className="select-file-btn"
+            onClick={() => { setFileUrl(''); fileInputRef.current?.click(); }}
+            type="button"
+          >
+            Select File
+          </button>
           {selectedFile ? (
-            <div className="drop-zone__file">
-              <span className="drop-zone__filename">{selectedFile.name}</span>
-              <span className="drop-zone__size">
-                ({(selectedFile.size / 1024 / 1024).toFixed(1)} MB)
-              </span>
-            </div>
+            <span className="source-area__filename">
+              {selectedFile.name}
+              <span className="source-area__size">({(selectedFile.size / 1024 / 1024).toFixed(1)} MB)</span>
+            </span>
           ) : (
-            <div className="drop-zone__placeholder">
-              Drop audio/video file here or click to browse
-              <span className="drop-zone__formats">mp3 · wav · mp4 · mkv · avi · mov · m4a · aac · flac · ogg · webm · wma</span>
-            </div>
+            <span className="source-area__hint">or drag &amp; drop a file here</span>
           )}
         </div>
-      ) : (
-        <input
-          className="file-path-input"
-          type="text"
-          value={filePath}
-          onChange={(e) => setFilePath(e.target.value)}
-          placeholder="C:\path\to\video.mp4 or /home/user/audio.mp3  (mp3, wav, mp4, mkv, avi, mov, m4a, aac, flac, ogg, webm, wma)"
-        />
-      )}
+        <div className="source-area__formats">
+          mp3 · wav · mp4 · mkv · avi · mov · m4a · aac · flac · ogg · webm · wma
+        </div>
+        <div className="source-area__url-row">
+          <span className="source-area__url-label">or URL:</span>
+          <input
+            className="source-area__url-input"
+            type="text"
+            value={fileUrl}
+            onChange={(e) => {
+              setFileUrl(e.target.value);
+              if (e.target.value) {
+                setSelectedFile(null);
+                setSourceType('url');
+              } else {
+                setSourceType('file');
+              }
+            }}
+            placeholder="https://... (audio, video, or YouTube URL)"
+          />
+          {fileUrl && (
+            <span className={`url-badge ${isYouTubeUrl(fileUrl) ? 'url-badge--youtube' : 'url-badge--direct'}`}>
+              {isYouTubeUrl(fileUrl) ? 'YouTube' : 'Direct URL'}
+            </span>
+          )}
+        </div>
+      </div>
 
       {/* Options row */}
       <div className="panel-row">
@@ -312,11 +338,16 @@ export function FileTranscriptionPanel({ settings, backendUrl }: FileTranscripti
           </div>
 
           <div className="file-result__section">
-            <div className="file-result__label">Transcription</div>
-            <pre className="file-result__text">{result.text}</pre>
+            <div className="file-result__label">Transcription <span className="file-result__edit-hint">— editable</span></div>
+            <textarea
+              className="file-result__text file-result__text--editable"
+              value={editedText}
+              onChange={(e) => setEditedText(e.target.value)}
+              rows={6}
+            />
             <button
               className="file-result__copy"
-              onClick={() => handleCopy(result.text)}
+              onClick={() => handleCopy(editedText)}
             >
               {copied ? 'Copied!' : 'Copy'}
             </button>
@@ -324,11 +355,16 @@ export function FileTranscriptionPanel({ settings, backendUrl }: FileTranscripti
 
           {result.refined_text && (
             <div className="file-result__section">
-              <div className="file-result__label">Refined</div>
-              <pre className="file-result__text">{result.refined_text}</pre>
+              <div className="file-result__label">Refined <span className="file-result__edit-hint">— editable</span></div>
+              <textarea
+                className="file-result__text file-result__text--editable"
+                value={editedRefined}
+                onChange={(e) => setEditedRefined(e.target.value)}
+                rows={6}
+              />
               <button
                 className="file-result__copy"
-                onClick={() => handleCopy(result.refined_text!)}
+                onClick={() => handleCopy(editedRefined)}
               >
                 Copy refined
               </button>
