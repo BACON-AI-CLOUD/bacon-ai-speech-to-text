@@ -78,6 +78,7 @@ export function TranscriptionDisplay({
   injectOnKeyboard = false,
 }: TranscriptionDisplayProps) {
   const [editText, setEditText] = useState('');
+  const [editedRefined, setEditedRefined] = useState('');
   const [copied, setCopied] = useState(false);
   const prevResultRef = useRef<TranscriptionResult | null>(null);
 
@@ -95,6 +96,7 @@ export function TranscriptionDisplay({
     if (lastResult && lastResult.text.trim() && lastResult !== prevResultRef.current) {
       prevResultRef.current = lastResult;
       setEditText(lastResult.text);
+      setEditedRefined('');
       if (onHistoryUpdate) {
         onHistoryUpdate((prev) => [lastResult, ...prev].slice(0, 50));
       }
@@ -201,15 +203,23 @@ export function TranscriptionDisplay({
     }
   }, [refinerEnabled, refinerResult, suppressActions, autoCopy, typeToKeyboard, notificationsEnabled, typingAutoFocus, targetWindow, cursorPositionMode, announcementMode, writeMessage, announcementVoice, backendUrl, lastResult, suffixInjections, injectOnLive, injectOnKeyboard]);
 
+  // Sync editedRefined when refiner result arrives
+  useEffect(() => {
+    if (refinerResult?.refined_text) {
+      setEditedRefined(refinerResult.refined_text);
+    }
+  }, [refinerResult]);
+
   const handleCopy = useCallback(async () => {
     try {
-      await navigator.clipboard.writeText(editText);
+      const textToCopy = refinerEnabled && editedRefined ? editedRefined : editText;
+      await navigator.clipboard.writeText(textToCopy);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
       // Clipboard API may not be available
     }
-  }, [editText]);
+  }, [editText, editedRefined, refinerEnabled]);
 
   if (!lastResult) {
     return (
@@ -264,15 +274,28 @@ export function TranscriptionDisplay({
           </div>
 
           {refinerEnabled ? (
-            <TextComparison
-              rawText={lastResult.text}
-              refinedText={refinerResult?.refined_text ?? null}
-              provider={refinerResult?.provider ?? ''}
-              processingTimeMs={refinerResult?.processing_time_ms ?? 0}
-              isRefining={isRefining}
-              error={refinerError}
-              onSelectText={(text) => setEditText(text)}
-            />
+            <>
+              <TextComparison
+                rawText={lastResult.text}
+                refinedText={refinerResult?.refined_text ?? null}
+                provider={refinerResult?.provider ?? ''}
+                processingTimeMs={refinerResult?.processing_time_ms ?? 0}
+                isRefining={isRefining}
+                error={refinerError}
+                onSelectText={(text) => { setEditText(text); setEditedRefined(text); }}
+              />
+              {!isRefining && refinerResult?.refined_text && (
+                <div className="td-refined-editable">
+                  <div className="td-refined-editable__label">Refined <span className="td-refined-editable__hint">&mdash; editable</span></div>
+                  <textarea
+                    className="td-refined-editable__textarea"
+                    value={editedRefined}
+                    onChange={(e) => setEditedRefined(e.target.value)}
+                    rows={4}
+                  />
+                </div>
+              )}
+            </>
           ) : (
             <textarea
               className="transcription-current__editor"

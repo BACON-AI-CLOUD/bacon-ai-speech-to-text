@@ -183,7 +183,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   injectOnKeyboard: false,
 };
 
-export type BuiltinPromptTemplate = 'cleanup' | 'nudge' | 'governance' | 'professional' | 'email' | 'whatsapp' | 'technical' | 'personal' | 'sheets-tsv' | 'sheets-script' | 'custom';
+export type BuiltinPromptTemplate = 'cleanup' | 'nudge' | 'governance' | 'professional' | 'email' | 'whatsapp' | 'technical' | 'personal' | 'sheets-tsv' | 'sheets-script' | 'markdown-doc' | 'custom';
 export type PromptTemplate = BuiltinPromptTemplate | string;  // string allows user-saved templates
 
 export interface UserPromptTemplate {

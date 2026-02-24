@@ -56,6 +56,7 @@ const TEMPLATE_LABELS: Record<string, string> = {
   personal: 'Personal',
   'sheets-tsv': 'Sheets — Data (TSV)',
   'sheets-script': 'Sheets — Apps Script',
+  'markdown-doc': 'Markdown \u2192 Clean Doc',
   custom: 'Custom',
 };
 

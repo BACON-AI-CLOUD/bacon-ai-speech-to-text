@@ -313,6 +313,25 @@ GOOGLE SHEETS API QUICK REFERENCE:
 
 Generate the complete script now. Output ONLY runnable code.`,
   },
+  'markdown-doc': {
+    label: 'Markdown \u2192 Clean Doc',
+    description: 'Convert Markdown syntax to clean formatted prose \u2014 headers, bullets, bold preserved without MD characters. Good for pasting into Word, Notion, or email.',
+    prompt: `You are a document formatter. Convert the following Markdown text to a clean, well-formatted plain-text document.
+
+Rules:
+- # Heading 1 \u2192 UPPERCASE WITH A LINE OF DASHES BELOW
+- ## Heading 2 \u2192 Title Case on its own line, blank line before it
+- **bold** \u2192 keep the concept prominent, remove asterisks
+- *italic* \u2192 remove asterisks, keep text
+- - bullet \u2192 \u2022 bullet (with space)
+- Numbered lists \u2192 keep as-is
+- Code blocks \u2192 preserve with 4-space indentation
+- Remove all remaining Markdown syntax characters (*, #, \\\`, _, ~, >)
+- Preserve all content \u2014 do NOT summarise or shorten
+- Output clean plain text only (no HTML)
+
+Convert:`,
+  },
   custom: {
     label: 'Custom',
     description: 'Write or paste your own prompt',

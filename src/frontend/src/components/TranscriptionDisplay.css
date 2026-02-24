@@ -313,3 +313,42 @@
   height: 16px;
   cursor: pointer;
 }
+
+/* Editable refined text area (FEAT-317) */
+.td-refined-editable {
+  margin-top: 8px;
+}
+
+.td-refined-editable__label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+}
+
+.td-refined-editable__hint {
+  font-weight: 400;
+  text-transform: none;
+  font-style: italic;
+}
+
+.td-refined-editable__textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px;
+  border: 1px solid #333;
+  border-radius: 6px;
+  background: #0d0d1a;
+  color: #e0e0e0;
+  font-family: inherit;
+  font-size: 1rem;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.td-refined-editable__textarea:focus {
+  outline: none;
+  border-color: #556;
+}
