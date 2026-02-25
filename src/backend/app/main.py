@@ -48,6 +48,7 @@ from .config import (
 from .integrations.router import get_router
 from .keyboard import KeyboardEmulator
 from .discuss import router as discuss_router
+from .extract_text import router as extract_text_router
 from .file_transcribe import router as file_transcribe_router
 from .refiner_api import router as refiner_router
 from .stt.whisper_engine import WhisperEngine, get_engine
@@ -129,6 +130,7 @@ app = FastAPI(
 
 app.include_router(refiner_router, prefix="/refiner", tags=["refiner"])
 app.include_router(discuss_router, prefix="/discuss", tags=["discuss"])
+app.include_router(extract_text_router, prefix="/extract-text", tags=["extract-text"])
 app.include_router(file_transcribe_router, prefix="/transcribe/file", tags=["file-transcription"])
 
 # CORS middleware for localhost development

@@ -18,6 +18,7 @@ from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 
+from .media_fetcher import fetch_audio_from_url
 from .refiner import get_refiner
 from .refiner.providers import PROVIDER_REGISTRY
 from .stt.whisper_engine import get_engine
@@ -47,6 +48,16 @@ SUPPORTED_EXTENSIONS = {
 class FileTranscribeOptions(BaseModel):
     """Options for file transcription via local path."""
     path: str
+    language: str = ""
+    output_format: str = "txt"
+    refine: bool = False
+    refine_provider: Optional[str] = None
+    custom_prompt: Optional[str] = None
+
+
+class UrlTranscribeOptions(BaseModel):
+    """Options for URL-based transcription (YouTube, direct audio/video links)."""
+    url: str
     language: str = ""
     output_format: str = "txt"
     refine: bool = False
@@ -277,6 +288,45 @@ async def transcribe_local_path(options: FileTranscribeOptions) -> FileTranscrib
         options.refine_provider,
         options.custom_prompt,
     )
+
+
+@router.post("/url", response_model=FileTranscribeResponse)
+async def transcribe_from_url(options: UrlTranscribeOptions) -> FileTranscribeResponse:
+    """
+    Transcribe audio/video from a URL.
+
+    Supports YouTube videos, direct audio/video file links, and 500+ sites
+    via yt-dlp. The audio is downloaded, transcribed with Whisper, and
+    optionally refined.
+    """
+    if options.output_format not in ("txt", "srt", "vtt"):
+        raise HTTPException(status_code=400, detail="output_format must be txt, srt, or vtt")
+
+    if not options.url.startswith(("http://", "https://")):
+        raise HTTPException(status_code=400, detail="URL must start with http:// or https://")
+
+    try:
+        audio_path, _ = await fetch_audio_from_url(options.url)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=422, detail=f"Failed to fetch URL: {e}") from e
+
+    try:
+        return await _transcribe_and_format(
+            audio_path,
+            options.language,
+            options.output_format,
+            options.refine,
+            options.refine_provider,
+            options.custom_prompt,
+        )
+    finally:
+        try:
+            audio_path.unlink(missing_ok=True)
+            audio_path.parent.rmdir()
+        except OSError:
+            pass
 
 
 @router.get("/output/{filename}")
