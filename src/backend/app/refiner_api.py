@@ -27,6 +27,7 @@ class RefineRequest(BaseModel):
 
     text: str
     provider: Optional[str] = None
+    custom_prompt: Optional[str] = None
 
 
 class RefinerConfigUpdate(BaseModel):
@@ -37,6 +38,7 @@ class RefinerConfigUpdate(BaseModel):
     timeout: Optional[float] = None
     custom_prompt: Optional[str] = None
     provider_configs: Optional[Dict[str, Dict[str, Any]]] = None
+    provider_models: Optional[Dict[str, list]] = None
 
 
 class RefineTestRequest(BaseModel):
@@ -44,11 +46,74 @@ class RefineTestRequest(BaseModel):
 
     text: Optional[str] = None
     provider: Optional[str] = None
+    custom_prompt: Optional[str] = None
 
 
 # =============================================================================
 # Endpoints
 # =============================================================================
+
+
+@router.get("/providers")
+async def list_providers() -> list[dict]:
+    """Return list of all providers with display name, API key requirement, and configured status."""
+    refiner = get_refiner()
+    result = []
+    for name, cls in PROVIDER_REGISTRY.items():
+        try:
+            provider = refiner._get_provider(name)
+            configured = provider.is_configured()
+        except Exception:
+            configured = False
+        result.append({
+            "id": name,
+            "name": cls.PROVIDER_DISPLAY_NAME,
+            "requires_api_key": cls.REQUIRES_API_KEY,
+            "configured": configured,
+        })
+    return result
+
+
+@router.get("/providers/{provider_name}/models")
+async def list_provider_models(provider_name: str) -> list[dict]:
+    """Return available models for a provider. For Groq/Ollama, queries live API."""
+    if provider_name not in PROVIDER_REGISTRY:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "error": f"Unknown provider: {provider_name}",
+                "available": list(PROVIDER_REGISTRY.keys()),
+            },
+        )
+    refiner = get_refiner()
+    try:
+        provider = refiner._get_provider(provider_name)
+        custom_models = refiner.get_custom_models(provider_name)
+        return await provider.list_models(custom_models=custom_models)
+    except Exception as e:
+        return JSONResponse(
+            status_code=500,
+            content={"error": f"Failed to list models: {e}"},
+        )
+
+
+@router.get("/providers/{provider_name}/test-connection")
+async def test_provider_connection(provider_name: str) -> dict:
+    """Test connectivity to a provider (API key validity, host reachability)."""
+    if provider_name not in PROVIDER_REGISTRY:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "error": f"Unknown provider: {provider_name}",
+                "available": list(PROVIDER_REGISTRY.keys()),
+            },
+        )
+    refiner = get_refiner()
+    try:
+        provider = refiner._get_provider(provider_name)
+        return await provider.test_connection()
+    except Exception as e:
+        return {"ok": False, "latency_ms": 0, "message": str(e)}
 
 
 @router.post("/process")
@@ -73,15 +138,28 @@ async def process_text(request: RefineRequest) -> Dict[str, Any]:
         )
 
     refiner = get_refiner()
-    result = await refiner.process(request.text, provider_override=request.provider)
+    # Force-enable for explicit refine calls (user intent is clear regardless of global toggle)
+    was_enabled = refiner._enabled
+    refiner._enabled = True
+    try:
+        result = await refiner.process(
+            request.text,
+            provider_override=request.provider,
+            prompt_override=request.custom_prompt or None,
+        )
+    finally:
+        refiner._enabled = was_enabled
 
-    return {
+    response = {
         "refined_text": result.refined_text,
         "provider": result.provider,
         "model": result.model,
         "processing_time_ms": result.processing_time_ms,
         "tokens_used": result.tokens_used,
     }
+    if result.warning:
+        response["warning"] = result.warning
+    return response
 
 
 @router.get("/config")
@@ -112,6 +190,7 @@ async def update_config(request: RefinerConfigUpdate) -> Dict[str, Any]:
             prompt=request.custom_prompt,
             timeout=request.timeout,
             provider_configs=request.provider_configs,
+            provider_models=request.provider_models,
         )
     except ValueError as e:
         return JSONResponse(
@@ -142,8 +221,12 @@ async def test_refiner(request: RefineTestRequest) -> Dict[str, Any]:
     refiner._enabled = True
 
     try:
-        result = await refiner.process(sample, provider_override=request.provider)
-        return {
+        result = await refiner.process(
+            sample,
+            provider_override=request.provider,
+            prompt_override=request.custom_prompt or None,
+        )
+        response = {
             "original": sample,
             "refined_text": result.refined_text,
             "provider": result.provider,
@@ -151,5 +234,8 @@ async def test_refiner(request: RefineTestRequest) -> Dict[str, Any]:
             "processing_time_ms": result.processing_time_ms,
             "tokens_used": result.tokens_used,
         }
+        if result.warning:
+            response["warning"] = result.warning
+        return response
     finally:
         refiner._enabled = was_enabled

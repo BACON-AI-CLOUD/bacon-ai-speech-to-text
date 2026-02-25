@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
-import type { TranscriptionResult, RefinerResult } from '../types/index.ts';
+import type { TranscriptionResult, RefinerResult, DiscussResult, SuffixInjection } from '../types/index.ts';
 import { TextComparison } from './TextComparison.tsx';
+import { playAnnouncement } from '../utils/announce.ts';
+import { buildTextWithInjections } from '../utils/buildTextWithInjections.ts';
 import './TranscriptionDisplay.css';
 
 interface TranscriptionDisplayProps {
@@ -10,16 +12,25 @@ interface TranscriptionDisplayProps {
   typeToKeyboard?: boolean;
   typingAutoFocus?: boolean;
   targetWindow?: string;
+  typingFocusDelay?: number;
+  typingFlashWindow?: boolean;
+  cursorPositionMode?: boolean;
+  announcementMode?: 'beep' | 'voice';
+  writeMessage?: string;
+  announcementVoice?: string;
   backendUrl?: string;
   refinerEnabled?: boolean;
   refinerResult?: RefinerResult | null;
   isRefining?: boolean;
   refinerError?: string | null;
-}
-
-function formatTimestamp(ts: number): string {
-  const d = new Date(ts);
-  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  suppressActions?: boolean;
+  discussResult?: DiscussResult | null;
+  isDiscussing?: boolean;
+  discussError?: string | null;
+  onHistoryUpdate?: (updater: React.SetStateAction<TranscriptionResult[]>) => void;
+  suffixInjections?: SuffixInjection[];
+  injectOnLive?: boolean;
+  injectOnKeyboard?: boolean;
 }
 
 function confidenceBadgeClass(confidence: number): string {
@@ -46,18 +57,29 @@ export function TranscriptionDisplay({
   typeToKeyboard = false,
   typingAutoFocus = true,
   targetWindow = '',
+  typingFocusDelay = 500,
+  typingFlashWindow = true,
+  cursorPositionMode = false,
+  announcementMode = 'beep',
+  writeMessage = 'Writing now.',
+  announcementVoice = 'en-GB-SoniaNeural',
   backendUrl = 'ws://localhost:8765',
   refinerEnabled = false,
   refinerResult = null,
   isRefining = false,
   refinerError = null,
+  suppressActions = false,
+  discussResult = null,
+  isDiscussing = false,
+  discussError = null,
+  onHistoryUpdate,
+  suffixInjections = [],
+  injectOnLive = false,
+  injectOnKeyboard = false,
 }: TranscriptionDisplayProps) {
-  const [history, setHistory] = useState<TranscriptionResult[]>([]);
   const [editText, setEditText] = useState('');
+  const [editedRefined, setEditedRefined] = useState('');
   const [copied, setCopied] = useState(false);
-  const [historyOpen, setHistoryOpen] = useState(true);
-  const [editingIndex, setEditingIndex] = useState<number | null>(null);
-  const [editingText, setEditingText] = useState('');
   const prevResultRef = useRef<TranscriptionResult | null>(null);
 
   // Request notification permission when enabled
@@ -67,37 +89,60 @@ export function TranscriptionDisplay({
     }
   }, [notificationsEnabled]);
 
+  // Track which result we've already sent to keyboard/clipboard/notification
+  const actionsDispatchedRef = useRef<string | null>(null);
+
   useEffect(() => {
     if (lastResult && lastResult.text.trim() && lastResult !== prevResultRef.current) {
       prevResultRef.current = lastResult;
       setEditText(lastResult.text);
-      setHistory((prev) => {
-        const updated = [lastResult, ...prev];
-        return updated.slice(0, 50);
-      });
-
-      // Auto-copy to clipboard
-      if (autoCopy && navigator.clipboard) {
-        navigator.clipboard.writeText(lastResult.text).catch(() => {});
+      setEditedRefined('');
+      if (onHistoryUpdate) {
+        onHistoryUpdate((prev) => [lastResult, ...prev].slice(0, 50));
       }
 
-      // Type to keyboard via backend emulation
+      // Skip actions when discuss mode is active
+      if (suppressActions) return;
+
+      // If refiner is enabled, defer keyboard/copy/notification to the refiner effect below
+      if (refinerEnabled) return;
+
+      // Refiner disabled: dispatch actions immediately with raw text
+      actionsDispatchedRef.current = lastResult.text;
+
+      const textForCopy = injectOnLive
+        ? buildTextWithInjections(lastResult.text, suffixInjections)
+        : lastResult.text;
+      const textForKeyboard = injectOnLive && injectOnKeyboard
+        ? buildTextWithInjections(lastResult.text, suffixInjections)
+        : lastResult.text;
+
+      if (autoCopy && navigator.clipboard) {
+        navigator.clipboard.writeText(textForCopy).catch(() => {});
+      }
+
       if (typeToKeyboard) {
         const httpUrl = backendUrl
           .replace('ws://', 'http://')
           .replace('wss://', 'https://');
-        fetch(`${httpUrl}/keyboard/type`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            text: lastResult.text,
-            auto_focus: typingAutoFocus,
-            target_window: targetWindow || undefined,
-          }),
-        }).catch(() => {});
+        (async () => {
+          if (announcementMode === 'voice') {
+            await playAnnouncement(httpUrl, writeMessage, announcementVoice);
+          }
+          fetch(`${httpUrl}/keyboard/type`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              text: textForKeyboard,
+              auto_focus: cursorPositionMode ? false : typingAutoFocus,
+              target_window: cursorPositionMode ? undefined : (targetWindow || undefined),
+              focus_delay_ms: typingFocusDelay,
+              flash_window: cursorPositionMode ? false : typingFlashWindow,
+            }),
+          }).catch(() => {});
+        })();
       }
 
-      // Browser notification
       if (notificationsEnabled && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
         new Notification('BACON-AI Voice', {
           body: lastResult.text.slice(0, 100),
@@ -105,50 +150,78 @@ export function TranscriptionDisplay({
         });
       }
     }
-  }, [lastResult, autoCopy, notificationsEnabled, typeToKeyboard, typingAutoFocus, targetWindow, backendUrl]);
+  }, [lastResult, autoCopy, notificationsEnabled, typeToKeyboard, typingAutoFocus, targetWindow, typingFocusDelay, typingFlashWindow, cursorPositionMode, announcementMode, writeMessage, announcementVoice, backendUrl, suppressActions, refinerEnabled, onHistoryUpdate, suffixInjections, injectOnLive, injectOnKeyboard]);
+
+  // When refiner is enabled, dispatch actions after refined text arrives
+  useEffect(() => {
+    if (!refinerEnabled || !refinerResult || suppressActions) return;
+    // Use refined text, falling back to raw if refinement returned empty
+    const outputText = refinerResult.refined_text || lastResult?.text || '';
+    if (!outputText.trim()) return;
+    // Don't dispatch twice for the same text
+    if (actionsDispatchedRef.current === outputText) return;
+    actionsDispatchedRef.current = outputText;
+
+    const textForCopy = injectOnLive
+      ? buildTextWithInjections(outputText, suffixInjections)
+      : outputText;
+    const textForKeyboard = injectOnLive && injectOnKeyboard
+      ? buildTextWithInjections(outputText, suffixInjections)
+      : outputText;
+
+    if (autoCopy && navigator.clipboard) {
+      navigator.clipboard.writeText(textForCopy).catch(() => {});
+    }
+
+    if (typeToKeyboard) {
+      const httpUrl = backendUrl
+        .replace('ws://', 'http://')
+        .replace('wss://', 'https://');
+      (async () => {
+        if (announcementMode === 'voice') {
+          await playAnnouncement(httpUrl, writeMessage, announcementVoice);
+        }
+        fetch(`${httpUrl}/keyboard/type`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text: textForKeyboard,
+            auto_focus: cursorPositionMode ? false : typingAutoFocus,
+            target_window: cursorPositionMode ? undefined : (targetWindow || undefined),
+            focus_delay_ms: typingFocusDelay,
+            flash_window: cursorPositionMode ? false : typingFlashWindow,
+          }),
+        }).catch(() => {});
+      })();
+    }
+
+    if (notificationsEnabled && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+      new Notification('BACON-AI Voice', {
+        body: outputText.slice(0, 100),
+        tag: 'bacon-voice-transcription',
+      });
+    }
+  }, [refinerEnabled, refinerResult, suppressActions, autoCopy, typeToKeyboard, notificationsEnabled, typingAutoFocus, targetWindow, cursorPositionMode, announcementMode, writeMessage, announcementVoice, backendUrl, lastResult, suffixInjections, injectOnLive, injectOnKeyboard]);
+
+  // Sync editedRefined when refiner result arrives
+  useEffect(() => {
+    if (refinerResult?.refined_text) {
+      setEditedRefined(refinerResult.refined_text);
+    }
+  }, [refinerResult]);
 
   const handleCopy = useCallback(async () => {
     try {
-      await navigator.clipboard.writeText(editText);
+      const textToCopy = refinerEnabled && editedRefined ? editedRefined : editText;
+      await navigator.clipboard.writeText(textToCopy);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
       // Clipboard API may not be available
     }
-  }, [editText]);
+  }, [editText, editedRefined, refinerEnabled]);
 
-  const handleDeleteEntry = useCallback((index: number) => {
-    setHistory((prev) => prev.filter((_, i) => i !== index));
-    if (editingIndex === index) {
-      setEditingIndex(null);
-      setEditingText('');
-    }
-  }, [editingIndex]);
-
-  const handleStartEdit = useCallback((index: number, text: string) => {
-    setEditingIndex(index);
-    setEditingText(text);
-  }, []);
-
-  const handleSaveEdit = useCallback((index: number) => {
-    setHistory((prev) =>
-      prev.map((item, i) =>
-        i === index ? { ...item, text: editingText } : item
-      )
-    );
-    setEditingIndex(null);
-    setEditingText('');
-  }, [editingText]);
-
-  const handleCopyEntry = useCallback(async (text: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-    } catch {
-      // Clipboard API may not be available
-    }
-  }, []);
-
-  if (!lastResult && history.length === 0) {
+  if (!lastResult) {
     return (
       <div className="transcription-display">
         <div className="transcription-empty">
@@ -160,6 +233,37 @@ export function TranscriptionDisplay({
 
   return (
     <div className="transcription-display">
+      {/* Discuss mode conversation display */}
+      {(discussResult || isDiscussing || discussError) && (
+        <div className="discuss-conversation">
+          {discussResult && (
+            <>
+              <div className="discuss-bubble discuss-bubble--user">
+                <div className="discuss-bubble__text">{discussResult.question}</div>
+              </div>
+              <div className="discuss-bubble discuss-bubble--elisabeth">
+                <div className="discuss-bubble__label">Elisabeth</div>
+                <div className="discuss-bubble__text">{discussResult.answer}</div>
+                <div className="discuss-bubble__meta">
+                  {discussResult.provider} / {discussResult.model} &middot; {discussResult.latency_ms}ms
+                </div>
+              </div>
+            </>
+          )}
+          {isDiscussing && (
+            <div className="discuss-bubble discuss-bubble--elisabeth discuss-bubble--thinking">
+              <div className="discuss-bubble__label">Elisabeth</div>
+              <div className="discuss-bubble__text">Thinking...</div>
+            </div>
+          )}
+          {discussError && (
+            <div className="discuss-bubble discuss-bubble--error">
+              <div className="discuss-bubble__text">{discussError}</div>
+            </div>
+          )}
+        </div>
+      )}
+
       {lastResult && (
         <div className="transcription-current">
           <div className="transcription-current__header">
@@ -170,15 +274,28 @@ export function TranscriptionDisplay({
           </div>
 
           {refinerEnabled ? (
-            <TextComparison
-              rawText={lastResult.text}
-              refinedText={refinerResult?.refined_text ?? null}
-              provider={refinerResult?.provider ?? ''}
-              processingTimeMs={refinerResult?.processing_time_ms ?? 0}
-              isRefining={isRefining}
-              error={refinerError}
-              onSelectText={(text) => setEditText(text)}
-            />
+            <>
+              <TextComparison
+                rawText={lastResult.text}
+                refinedText={refinerResult?.refined_text ?? null}
+                provider={refinerResult?.provider ?? ''}
+                processingTimeMs={refinerResult?.processing_time_ms ?? 0}
+                isRefining={isRefining}
+                error={refinerError}
+                onSelectText={(text) => { setEditText(text); setEditedRefined(text); }}
+              />
+              {!isRefining && refinerResult?.refined_text && (
+                <div className="td-refined-editable">
+                  <div className="td-refined-editable__label">Refined <span className="td-refined-editable__hint">&mdash; editable</span></div>
+                  <textarea
+                    className="td-refined-editable__textarea"
+                    value={editedRefined}
+                    onChange={(e) => setEditedRefined(e.target.value)}
+                    rows={4}
+                  />
+                </div>
+              )}
+            </>
           ) : (
             <textarea
               className="transcription-current__editor"
@@ -202,72 +319,6 @@ export function TranscriptionDisplay({
         </div>
       )}
 
-      {history.length > 0 && (
-        <div className="transcription-history">
-          <button
-            className="transcription-history__toggle"
-            onClick={() => setHistoryOpen((prev) => !prev)}
-            aria-expanded={historyOpen}
-          >
-            <span className="transcription-history__toggle-icon">
-              {historyOpen ? '\u25BC' : '\u25B6'}
-            </span>
-            History ({history.length})
-          </button>
-
-          {historyOpen && (
-            <div className="transcription-history__list">
-              {history.map((result, index) => (
-                <div key={`${result.timestamp}-${index}`} className="transcription-history__entry">
-                  {editingIndex === index ? (
-                    <textarea
-                      className="transcription-history__edit-area"
-                      value={editingText}
-                      onChange={(e) => setEditingText(e.target.value)}
-                      rows={2}
-                    />
-                  ) : (
-                    <div className="transcription-history__text">{result.text}</div>
-                  )}
-                  <div className="transcription-history__meta">
-                    <span className={`confidence-badge confidence-badge--small ${confidenceBadgeClass(result.confidence)}`}>
-                      {Math.round(result.confidence * 100)}%
-                    </span>
-                    <span>{formatTimestamp(result.timestamp)}</span>
-                  </div>
-                  <div className="transcription-history__actions">
-                    {editingIndex === index ? (
-                      <>
-                        <button className="btn-icon" onClick={() => handleSaveEdit(index)} title="Save">
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="20 6 9 17 4 12" /></svg>
-                        </button>
-                        <button className="btn-icon" onClick={() => setEditingIndex(null)} title="Cancel">
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <button className="btn-icon" onClick={() => handleCopyEntry(result.text)} title="Copy">
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>
-                        </button>
-                        <button className="btn-icon" onClick={() => handleStartEdit(index, result.text)} title="Edit">
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
-                        </button>
-                        <button className="btn-icon" onClick={() => downloadAsMarkdown(result)} title="Download .md">
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" /></svg>
-                        </button>
-                        <button className="btn-icon btn-icon--danger" onClick={() => handleDeleteEntry(index)} title="Delete">
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }

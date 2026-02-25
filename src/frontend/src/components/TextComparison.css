@@ -4,7 +4,7 @@
 
 .text-comparison__panels {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 12px;
 }
 
@@ -53,11 +53,29 @@
   margin-top: 4px;
 }
 
+.text-comparison__controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.text-comparison__checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: #c0c0d0;
+  cursor: pointer;
+}
+
+.text-comparison__checkbox-label input[type="checkbox"] {
+  accent-color: #2563eb;
+}
+
 .text-comparison__meta {
-  text-align: right;
   font-size: 0.75rem;
   color: #666;
-  margin-top: 8px;
 }
 
 .text-comparison__error {

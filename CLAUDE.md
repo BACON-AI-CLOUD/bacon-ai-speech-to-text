@@ -8,8 +8,8 @@
 | Field | Value |
 |-------|-------|
 | Project | bacon-ai-voice |
-| Description | STT web interface for Claude Code - speech-to-text with local Whisper, multiple activation modes, and multi-backend integration |
-| Repository | TBD |
+| Description | STT web interface for Claude Code - speech-to-text with local Whisper, AI text refinement, discuss mode, and multi-backend integration |
+| Repository | BACON-AI-CLOUD/bacon-ai-speech-to-text |
 | Tech Stack | React+Vite+TypeScript frontend, Python+FastAPI backend, OpenAI Whisper (local), WebSocket |
 | Created | 2026-02-11 |
 | Owner | Colin Bacon |
@@ -18,14 +18,14 @@
 
 | Field | Value |
 |-------|-------|
-| **Current Phase** | v1.1 AI Text Refinement - Design Complete, Pre-Implementation |
-| **Phase Status** | design-complete |
-| **Active Features** | v1.1 Text Refinement (REQ-101 to REQ-117) |
-| **Active Branch** | feature/v1.1-text-refinement |
-| **Last Action** | Gap analysis complete, PRD/ADD/CLAUDE.md conflicts resolved |
-| **Next Step** | Human checkpoint (Pre-Implementation), then delegate coding to sub-agents |
+| **Current Phase** | v1.5 Document & Text Processing |
+| **Phase Status** | in-progress |
+| **Active Features** | FEAT-312..317 + BUGFIX-001 |
+| **Active Branch** | feature/v1.4-file-transcription |
+| **Last Action** | v1.5 implementation complete (5 agents, 4 commits) - all 186 tests pass |
+| **Next Step** | UAT - test File tab (Select File + URL/YouTube), Text Editor tab, editable results, Markdown template |
 | **Blockers** | None |
-| **Last Updated** | 2026-02-16 by orchestrator |
+| **Last Updated** | 2026-02-24 by orchestrator |
 
 ## YOUR ROLE: ORCHESTRATOR
 
@@ -66,20 +66,21 @@ You are the **BACON-AI Project Orchestrator**. You plan, delegate, coordinate, v
 ## ARCHITECTURE OVERVIEW
 
 ### Components
-1. **Frontend (React+Vite+TS)**: Web UI with microphone access, waveform display, activation controls
-2. **Backend (Python+FastAPI)**: Whisper STT engine, audio processing, WebSocket server
-3. **Integration Layer**: Three output backends:
+1. **Frontend (React+Vite+TS)**: Web UI with microphone access, waveform display, activation controls, left history sidebar, refiner settings
+2. **Backend (Python+FastAPI)**: Whisper STT engine, audio processing, WebSocket server, AI text refinement pipeline, discuss mode with TTS
+3. **Refiner Providers** (6 total): Groq, Ollama, Gemini, OpenAI, Anthropic, Claude CLI
+4. **Integration Layer**: Three output backends:
    - **Claude API Direct**: Send transcribed text to Claude API, display response
    - **WebSocket Bridge**: Inject text into running Claude Code session
    - **MCP Server**: Native Claude Code MCP tool integration
 
-### Existing Reusable Components (from bacon-ai-voice-mcp)
-Located at: `/mnt/c/Users/colin/Claude-Work/mcp-servers/bacon-ai-voice-mcp/`
-- `stt/whisper_engine.py` - Faster-Whisper with GPU auto-detection (REUSE)
-- `audio/recorder.py` - VAD-enabled audio recording (REFERENCE for backend)
-- `config.py` - GPU detection, model configs (REUSE)
+### API Key Storage
+- **Location:** `~/.config/bacon-ai-voice/.env` (python-dotenv)
+- **Migration:** Auto-migrates from refiner.json on first startup
+- **Env vars:** GROQ_API_KEY, ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY
+- **Frontend never sees keys**: Only sends keys to backend, backend stores in .env
 
-### Activation Modes (all 3 to be implemented)
+### Activation Modes (all 3 implemented)
 1. **Push-to-talk**: Hold key to record, release to transcribe
 2. **Voice activation**: Always listening with silence/VAD detection
 3. **Toggle button**: Click to start, click to stop
@@ -137,40 +138,99 @@ User-selectable: tiny, base, small, medium, large-v3
 | FEAT-013 | Error handling UX (all error states) | Phase D | feature/FEAT-009-014-polish | completed | Included in Phase D tests |
 | FEAT-014 | Startup scripts (start.sh / start.bat) | Phase D | feature/FEAT-009-014-polish | completed | Included in Phase D tests |
 
-### Post-v1.0 Bug Fixes (on develop, merged to main 2026-02-16)
+### Post-v1.0 Bug Fixes (merged to main 2026-02-16)
 
 | ID | Title | Status | Details |
 |----|-------|--------|---------|
-| FIX-001 | CORS blocking /windows endpoint | completed | Added /windows to CORS allowed origins |
+| FIX-001 | CORS blocking /windows endpoint | completed | allow_origins=["*"] |
 | FIX-002 | Silence timeout not auto-stopping in toggle mode | completed | Standalone silence monitor in App.tsx |
-| FIX-003 | WebSocket StrictMode race condition | completed | Fixed double-mount cleanup |
-| FIX-004 | StatusBar crash on undefined state | completed | Added null safety checks |
+| FIX-003 | WebSocket StrictMode race condition | completed | wsRef.current !== ws guard |
+| FIX-004 | StatusBar crash on undefined state | completed | Null safety checks |
 
 ### Post-v1.0 Enhancements (on develop)
 
 | ID | Title | Status | Details |
 |----|-------|--------|---------|
 | FEAT-015 | Auto-focus typing to target window | completed | Types transcription to specified window title |
-| FEAT-016 | Global hotkey (system-wide recording toggle) | planned | Plan exists, deferred to v1.2 |
+| FEAT-016 | Global hotkey (system-wide recording toggle) | completed | Implemented on feature/multi-version-ports |
 
-### v1.1 Features (IN PROGRESS - feature/v1.1-text-refinement)
+### v1.1 Features (ALL COMPLETE - on feature/multi-version-ports)
 
 | Feature ID | Title | Priority | Status | PRD Ref |
 |-----------|-------|----------|--------|---------|
-| FEAT-101 | Refiner pipeline (raw text → AI cleanup → clean text) | P0 | planned | REQ-101 |
-| FEAT-102 | Groq provider (cloud, ~200ms) | P0 | planned | REQ-102 |
-| FEAT-103 | Ollama provider (local, free) | P0 | planned | REQ-103 |
-| FEAT-104 | Gemini provider (cloud) | P1 | planned | REQ-104 |
-| FEAT-105 | Refiner on/off toggle UI | P0 | planned | REQ-105 |
-| FEAT-106 | Provider selection + API key management | P0 | planned | REQ-106, REQ-107 |
-| FEAT-107 | Raw vs refined text comparison | P0 | planned | REQ-108 |
-| FEAT-108 | Customizable cleanup prompt | P1 | planned | REQ-109 |
-| FEAT-109 | Test refiner button | P1 | planned | REQ-110 |
-| FEAT-110 | Auto-refine after transcription | P0 | planned | REQ-111 |
-| FEAT-111 | Refined text for keyboard typing | P0 | planned | REQ-112 |
-| FEAT-112 | REST endpoints (process, config, test) | P0 | planned | REQ-113-115 |
-| FEAT-113 | Graceful fallback on provider error | P0 | planned | REQ-116 |
-| FEAT-114 | API key security (backend config.json) | P0 | planned | REQ-117 |
+| FEAT-101 | Refiner pipeline (raw text -> AI cleanup -> clean text) | P0 | completed | REQ-101 |
+| FEAT-102 | Groq provider (cloud, ~200ms) | P0 | completed | REQ-102 |
+| FEAT-103 | Ollama provider (local, free) | P0 | completed | REQ-103 |
+| FEAT-104 | Gemini provider (cloud) | P1 | completed | REQ-104 |
+| FEAT-105 | Refiner on/off toggle UI | P0 | completed | REQ-105 |
+| FEAT-106 | Provider selection + API key management | P0 | completed | REQ-106, REQ-107 |
+| FEAT-107 | Raw vs refined text comparison | P0 | completed | REQ-108 |
+| FEAT-108 | Customizable cleanup prompt + templates | P1 | completed | REQ-109 |
+| FEAT-109 | Test refiner button | P1 | completed | REQ-110 |
+| FEAT-110 | Auto-refine after transcription | P0 | completed | REQ-111 |
+| FEAT-111 | Refined text for keyboard typing | P0 | completed | REQ-112 |
+| FEAT-112 | REST endpoints (process, config, test, providers, models) | P0 | completed | REQ-113-115 |
+| FEAT-113 | Graceful fallback on provider error with warnings | P0 | completed | REQ-116 |
+| FEAT-114 | API key security (.env file, auto-migration) | P0 | completed | REQ-117 |
+
+### v1.2 Features (ALL COMPLETE - on feature/multi-version-ports)
+
+| Feature ID | Title | Priority | Status | Notes |
+|-----------|-------|----------|--------|-------|
+| FEAT-201 | OpenAI provider (55 live models, chat filtering) | P1 | completed | Live API model listing |
+| FEAT-202 | Anthropic provider (Claude API) | P1 | completed | httpx-based |
+| FEAT-203 | Claude CLI provider (`claude --print` subprocess) | P2 | completed | Clean env, /tmp cwd, 60s timeout |
+| FEAT-204 | Chat with Elisabeth discuss mode | P1 | completed | TTS via edge-tts, conversation history |
+| FEAT-205 | HistorySidebar component (left sidebar layout) | P1 | completed | Claude Desktop-style layout |
+| FEAT-206 | Prompt template system (save/delete/reset) | P1 | completed | 8 built-in + custom user templates |
+| FEAT-207 | Custom model management per provider | P1 | completed | Add/remove custom models in UI |
+| FEAT-208 | .env file for API key storage | P0 | completed | Auto-migration from config.json |
+| FEAT-209 | Deep-merge config fix (prevent key loss) | P0 | completed | Per-provider dict.update() |
+| FEAT-210 | Provider warning messages in UI | P1 | completed | Rate limits, auth failures, timeouts |
+| FEAT-211 | Test connection per provider | P1 | completed | GET /providers/{name}/test-connection |
+
+### v1.3 Features (PLANNED - PRD-003, feature/v1.2-tts-edge)
+
+| Feature ID | Title | Priority | Status | PRD Ref |
+|-----------|-------|----------|--------|---------|
+| FEAT-301 | Right sidebar: quick provider/model/template switching | P0 | planned | REQ-301 |
+| FEAT-302 | Right sidebar: output controls tab | P0 | planned | REQ-302 |
+| FEAT-303 | Audio beeps for all activation modes | P1 | planned | REQ-303 |
+| FEAT-304 | Chat tab (chatbot UI + voice/text input) | P0 | planned | REQ-304-306 |
+| FEAT-305 | Dictation mode (pause/resume, canvas sessions) | P0 | planned | REQ-307-310 |
+| FEAT-306 | MCP server for text refinement | P1 | planned | REQ-311-312 |
+| FEAT-307 | Wake word trigger ("Hey Colin") | P2 | planned | REQ-313-314 |
+| FEAT-308 | Mini-button collapse | P1 | planned | REQ-315-316 |
+| FEAT-309 | History persistence + project grouping | P0 | planned | REQ-317-320 |
+
+### v1.5 Features (IN PROGRESS - feature/v1.4-file-transcription)
+
+| Feature ID | Title | Priority | Status | Notes |
+|-----------|-------|----------|--------|-------|
+| FEAT-312 | File tab UX: unified Select File + drag-drop + URL input field | P0 | completed | Removes Upload/Local-path toggle; YouTube badge detection |
+| FEAT-313 | URL + YouTube transcription (yt-dlp backend) | P0 | completed | POST /transcribe/file/url; reuses Whisper pipeline |
+| FEAT-314 | Text Editor tab (load/save/clear/preview/refine/copy/type) | P1 | completed | .txt/.md client-side; .pdf/.docx via /extract-text/upload |
+| FEAT-315 | Document text extraction backend (.pdf, .docx) | P1 | completed | POST /extract-text/upload; pypdf + python-docx |
+| FEAT-316 | Markdown → Clean Doc refiner template | P1 | completed | Added to BUILTIN_TEMPLATES + TEMPLATE_LABELS |
+| FEAT-317 | Editable refined text (Live tab + File tab) | P0 | completed | editedRefined textarea; Copy/Type uses edited version |
+| BUGFIX-001 | Target Window dropdown always empty on first open | — | completed | fetchedWindowsRef reset on panel close → re-fetches on open |
+
+### v1.4 Features (COMPLETE - feature/v1.4-file-transcription)
+
+| Feature ID | Title | Priority | Status | PRD Ref |
+|-----------|-------|----------|--------|---------|
+| FEAT-310 | File Transcription panel (upload + path + formats + refine + download) | P0 | in-progress | REQ-401 to REQ-408 |
+| FEAT-311 | Suffix Injection Prompts (configurable append-to-prompt checkboxes) | P0 | in-progress | REQ-409 to REQ-413 |
+
+## TEST COUNTS (Verified 2026-02-24)
+
+| Area | Count | Details |
+|------|-------|---------|
+| Backend | 103 | config:15, health:3, models:5, transcribe:3, websocket:6, integrations:20, refiner:6, refiner_api:12, refiner_providers:33 |
+| Frontend | 83 | useSettings:6, useWebSocket:9, TranscriptionDisplay:9, useActivation:21, SettingsPanel:7, ErrorDisplay:4, ModelProgress:3, RefinerSettings:10, TextComparison:6, QuickControlsSidebar:8 |
+| **Total** | **186** | **0 failures** |
+
+_Note: v1.5 added no new test files (new components are integration-tested via UAT)._
 
 ## LESSONS LEARNED (PROJECT-SPECIFIC)
 
@@ -181,6 +241,9 @@ User-selectable: tiny, base, small, medium, large-v3
 | 3 | Git unrelated histories merge (55+ add/add conflicts) | Force push after extracting needed files from remote | Use force push for initial repo setup, not merge |
 | 4 | thebacons account denied push to BACON-AI-CLOUD | Use BACON-AI-CLOUD PAT from ~/.env | Always check which GitHub account has push access |
 | 5 | PRD vs ADD conflicts (API key storage, default provider) | Resolved during gap analysis, docs updated | Run gap analysis between PRD and ADD before coding |
+| 6 | Shallow dict.update() wiped API keys on config save | Deep-merge: per-provider dict.update() in loop | Always deep-merge nested config dicts |
+| 7 | API keys in config.json exposed on disk | Moved to .env file with auto-migration | Use .env for secrets, config files for non-secrets |
+| 8 | OpenAI 429 rate limit with no user feedback | Added warning field to RefinerResult, UI shows orange banner | Always surface API errors to user with actionable message |
 
 ## KEY DECISIONS
 
@@ -196,9 +259,32 @@ User-selectable: tiny, base, small, medium, large-v3
 | 8 | AnalyserNode+RMS for browser VAD | Simpler than ONNX, no model dependency, sufficient accuracy | - | 2026-02-11 |
 | 9 | localStorage for frontend settings | Simple, no database, survives page refreshes | - | 2026-02-11 |
 | 10 | Git branching over separate directories | Single repo, incremental features, full diff/merge tooling | PLAN-VERSIONING-STRATEGY | 2026-02-16 |
-| 11 | API keys in backend config.json (not localStorage) | More secure, keys never touch browser | ADD-002 | 2026-02-16 |
+| 11 | API keys in .env file (not config.json or localStorage) | Most secure - secrets separated from config, auto-migration | ADD-002 | 2026-02-19 |
 | 12 | Ollama as default refiner provider | Works without API key, best first-run UX | PRD-002 | 2026-02-16 |
-| 13 | Global hotkey deferred to v1.2 | v1.1 focused on text refinement, hotkey is separate concern | PLAN-VERSIONING-STRATEGY | 2026-02-16 |
+| 13 | 6 refiner providers (Groq, Ollama, Gemini, OpenAI, Anthropic, Claude CLI) | Maximum flexibility for user's existing API keys | - | 2026-02-19 |
+| 14 | HistorySidebar left panel layout | Claude Desktop-style, always-visible history | - | 2026-02-19 |
+| 15 | edge-tts for discuss mode TTS | Free, no API key, good voice quality | - | 2026-02-19 |
+| 16 | Conversation history in discuss mode | Frontend tracks and sends history, backend builds full message array | - | 2026-02-19 |
+| 17 | File transcription as separate tab | Clean separation from live recording UX | - | 2026-02-23 |
+| 18 | Suffix injections as frontend-only feature | Injections arrive at backend as part of custom_prompt | - | 2026-02-23 |
+| 19 | AHK v2 tray icon (no pystray) | pystray must run as Windows process; AHK already is | - | 2026-02-23 |
+| 20 | ttyd port guard in Chrome ext | Prevent false-positive on non-ttyd xterm.js pages | - | 2026-02-23 |
+
+## DOCUMENTS
+
+| Document | Path | Status |
+|----------|------|--------|
+| PRD-001 (v1.0 Core STT) | docs/prd/PRD-001-bacon-ai-voice.md | Implemented |
+| PRD-002 (v1.1 Text Refinement) | docs/prd/PRD-002-v1.1-text-refinement.md | Implemented |
+| PRD-003 (v1.3 UX Enhancements) | docs/prd/PRD-003-v1.3-ux-enhancements.md | Draft |
+| ADD-001 (v1.0 Architecture) | docs/add/ADD-001-architecture.md | Implemented |
+| ADD-002 (v1.1 Architecture) | docs/add/ADD-002-v1.1-text-refinement.md | Needs update (missing .env, new providers) |
+| ADD-003 (v1.3 Architecture) | TBD | Not yet created |
+| Test Strategy | docs/test-strategy/TEST-STRATEGY-001.md | Current |
+| PRD-004 (v1.4 File Transcription) | docs/prd/PRD-004-v1.4-file-transcription.md | Draft |
+| ADD-004 (v1.4 Architecture) | docs/add/ADD-004-v1.4-file-transcription.md | Draft |
+| TEST-STRATEGY-003 (v1.4) | docs/test-strategy/TEST-STRATEGY-003-v1.4.md | Draft |
+| Versioning Plan | docs/plans/PLAN-VERSIONING-STRATEGY-20260216.md | Approved |
 
 ## RECOVERY PROTOCOL (READ AFTER COMPACTION)
 
@@ -217,10 +303,10 @@ User-selectable: tiny, base, small, medium, large-v3
 ```
 bacon-ai-voice/
 ├── docs/
-│   ├── prd/                    # Project Requirements
+│   ├── prd/                    # Project Requirements (PRD-001, PRD-002, PRD-003)
 │   ├── prd-features/           # Feature-level requirements
 │   ├── urd/                    # User Requirements
-│   ├── add/                    # Architecture Design
+│   ├── add/                    # Architecture Design (ADD-001, ADD-002)
 │   ├── tsd/                    # Technical Specifications
 │   ├── fsd/                    # Functional Specifications
 │   ├── test-strategy/          # Test Strategy + Cases
@@ -235,9 +321,16 @@ bacon-ai-voice/
 │   └── audit/
 ├── src/
 │   ├── frontend/               # React+Vite+TypeScript
+│   │   └── src/components/     # HistorySidebar, RefinerSettings, TextComparison, etc.
 │   └── backend/                # Python+FastAPI+Whisper
+│       └── app/
+│           ├── refiner/        # AI text refinement pipeline
+│           │   └── providers/  # groq, ollama, gemini, openai, anthropic, claude_cli
+│           ├── discuss.py      # Chat with Elisabeth (TTS via edge-tts)
+│           └── refiner_api.py  # REST API for refiner
 ├── tests/
 │   ├── unit/
+│   │   └── backend/            # 103 tests
 │   ├── integration/
 │   ├── e2e/
 │   ├── performance/

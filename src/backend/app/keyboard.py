@@ -141,13 +141,16 @@ class KeyboardEmulator:
                     timeout=10,
                 )
             elif self.tool == "sendkeys":
-                # WSL: Use PowerShell SendKeys
+                # WSL: Copy to clipboard then paste with Ctrl+V
+                # SendKeys.SendWait interprets special chars and has buffer limits,
+                # so clipboard paste is more reliable for longer text.
                 escaped = text.replace("'", "''")
                 subprocess.run(
                     [
                         "powershell.exe", "-c",
+                        f"Set-Clipboard -Value '{escaped}'; "
                         f"Add-Type -AssemblyName System.Windows.Forms; "
-                        f"[System.Windows.Forms.SendKeys]::SendWait('{escaped}')"
+                        f"[System.Windows.Forms.SendKeys]::SendWait('^v')"
                     ],
                     check=True,
                     timeout=10,
@@ -158,6 +161,100 @@ class KeyboardEmulator:
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
             return False
 
+    def focus_and_type(
+        self,
+        text: str,
+        target_window: str = '',
+        use_alt_tab: bool = False,
+        focus_delay_ms: int = 500,
+        flash_window: bool = True,
+    ) -> tuple[bool, bool]:
+        """
+        Focus a window then type text in a single atomic operation.
+
+        On WSL/sendkeys this runs as ONE PowerShell call so the focus obtained
+        in step 1 is guaranteed to still be active when Ctrl+V fires in step 2.
+        Returns (focused: bool, typed: bool).
+        """
+        if self.tool != "sendkeys":
+            # Non-WSL: fall back to separate calls (no race condition on X11/Wayland)
+            import time
+            focused = False
+            if target_window:
+                focused = self.focus_window_by_title(target_window)
+            elif use_alt_tab:
+                focused = self.focus_previous_window()
+            if focused:
+                time.sleep(focus_delay_ms / 1000.0)
+            typed = self.type_text(text)
+            return focused, typed
+
+        escaped_text = text.replace("'", "''")
+        delay_ms = max(100, int(focus_delay_ms))
+
+        # Win32 helper signatures loaded once (wrapped in try/catch so re-loading is safe)
+        win32_setup = (
+            "try { Add-Type -MemberDefinition ("
+            "'[DllImport(\"user32.dll\")] public static extern bool SetForegroundWindow(IntPtr hWnd);' + "
+            "'[DllImport(\"user32.dll\")] public static extern bool FlashWindow(IntPtr hWnd, bool bInvert);'"
+            ") -Name WinAPI -Namespace BVKB -PassThru | Out-Null } catch {}; "
+        )
+
+        flash_on = "[BVKB.WinAPI]::FlashWindow($p.MainWindowHandle, $true) | Out-Null; " if flash_window else ""
+        flash_off = "[BVKB.WinAPI]::FlashWindow($p.MainWindowHandle, $false) | Out-Null; " if flash_window else ""
+
+        # Build the focus block (runs inside the same PS process)
+        if target_window:
+            escaped_title = target_window.replace("'", "''")
+            focus_block = (
+                win32_setup +
+                "$p = Get-Process | Where-Object { "
+                "$_.MainWindowTitle -like '*" + escaped_title + "*' -and $_.MainWindowHandle -ne 0 "
+                "} | Select-Object -First 1; "
+                "if ($p) { "
+                "[BVKB.WinAPI]::SetForegroundWindow($p.MainWindowHandle) | Out-Null; "
+                + flash_on +
+                f"Start-Sleep -Milliseconds {delay_ms}; "
+                "$focused = $true "
+                "} else { $focused = $false }; "
+            )
+        elif use_alt_tab:
+            focus_block = (
+                "Add-Type -AssemblyName System.Windows.Forms; "
+                "[System.Windows.Forms.SendKeys]::SendWait('%{TAB}'); "
+                f"Start-Sleep -Milliseconds {delay_ms}; "
+                "$focused = $true; "
+                "$p = $null; "  # no hwnd for flash in alt-tab mode
+            )
+            flash_on = ""   # can't flash without hwnd
+            flash_off = ""
+        else:
+            focus_block = "$focused = $false; $p = $null; "
+            flash_on = ""
+            flash_off = ""
+
+        paste_block = (
+            f"Set-Clipboard -Value '{escaped_text}'; "
+            "Add-Type -AssemblyName System.Windows.Forms; "
+            "[System.Windows.Forms.SendKeys]::SendWait('^v'); "
+            + flash_off +
+            "Write-Output \"$focused|ok\""
+        )
+
+        try:
+            result = subprocess.run(
+                ["powershell.exe", "-c", focus_block + paste_block],
+                capture_output=True,
+                text=True,
+                timeout=max(15, delay_ms / 1000 + 10),
+            )
+            output = result.stdout.strip()
+            focused = "|ok" in output and output.split("|")[0].strip().lower() == "true"
+            typed = "|ok" in output
+            return focused, typed
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
+            return False, False
+
     def list_windows(self) -> list[dict[str, str]]:
         """Return a list of visible windows with titles. Each entry has 'title' and 'process'."""
         if self.tool == "none":
@@ -167,16 +264,18 @@ class KeyboardEmulator:
             if self.tool == "sendkeys":
                 result = subprocess.run(
                     [
-                        "powershell.exe", "-c",
+                        "powershell.exe", "-NoProfile", "-c",
+                        "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; "
                         "Get-Process | Where-Object { $_.MainWindowTitle -ne '' -and $_.MainWindowHandle -ne 0 } "
                         "| Select-Object ProcessName, MainWindowTitle "
                         "| ForEach-Object { $_.ProcessName + '|' + $_.MainWindowTitle }"
                     ],
-                    capture_output=True, text=True, timeout=5,
+                    capture_output=True, timeout=15,
                 )
+                output = result.stdout.decode("utf-8", errors="replace")
                 windows = []
                 seen = set()
-                for line in result.stdout.strip().split("\n"):
+                for line in output.strip().split("\n"):
                     line = line.strip()
                     if not line or "|" not in line:
                         continue

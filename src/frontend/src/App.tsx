@@ -8,11 +8,16 @@ import { StatusBar } from './components/StatusBar.tsx';
 import { AudioCapture } from './components/AudioCapture.tsx';
 import { WaveformVisualizer } from './components/WaveformVisualizer.tsx';
 import { TranscriptionDisplay } from './components/TranscriptionDisplay.tsx';
+import { HistorySidebar } from './components/HistorySidebar.tsx';
+import { QuickControlsSidebar } from './components/QuickControlsSidebar.tsx';
 import { SettingsPanel } from './components/SettingsPanel.tsx';
 import { ErrorDisplay } from './components/ErrorDisplay.tsx';
 import { ModelProgress } from './components/ModelProgress.tsx';
+import { FileTranscriptionPanel } from './components/FileTranscriptionPanel.tsx';
+import { TextEditorPanel } from './components/TextEditorPanel.tsx';
 import { playCountdownBeeps, playBeep, warmUpAudio } from './utils/beep.ts';
-import type { ModelDownloadProgress, RefinerResult } from './types/index.ts';
+import { playAnnouncement } from './utils/announce.ts';
+import type { ModelDownloadProgress, RefinerResult, DiscussResult, TranscriptionResult } from './types/index.ts';
 import './App.css';
 
 function App() {
@@ -33,12 +38,21 @@ function App() {
   }, []);
 
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [quickControlsOpen, setQuickControlsOpen] = useState(true);
   const [remoteTriggered, setRemoteTriggered] = useState(false);
   const [countdown, setCountdown] = useState(0); // 3,2,1,0 - 0 = not counting
   const [miniMode, setMiniMode] = useState(false);
   const [refinerResult, setRefinerResult] = useState<RefinerResult | null>(null);
   const [isRefining, setIsRefining] = useState(false);
   const [refinerError, setRefinerError] = useState<string | null>(null);
+  const [discussResult, setDiscussResult] = useState<DiscussResult | null>(null);
+  const [isDiscussing, setIsDiscussing] = useState(false);
+  const [discussError, setDiscussError] = useState<string | null>(null);
+  const [history, setHistory] = useState<TranscriptionResult[]>([]);
+  const [discussHistory, setDiscussHistory] = useState<Array<{ role: string; content: string }>>([]);
+  const [activeTab, setActiveTab] = useState<'live' | 'file' | 'text'>('live');
+  // Ref mirrors state so the discuss effect always reads the latest history (avoids stale closure race)
+  const discussHistoryRef = useRef<Array<{ role: string; content: string }>>([]);
 
   const {
     connectionState,
@@ -155,8 +169,41 @@ function App() {
     console.log('[App] handleRecordingStop called');
     stopRecordingRef.current();
     sendControl({ action: 'stop' });
-    playBeep(settings.micOffBeepFreq, settings.beepDuration, settings.beepVolume);
-  }, [sendControl, settings.micOffBeepFreq, settings.beepDuration, settings.beepVolume]);
+    if (settings.announcementMode === 'voice') {
+      const httpUrl = settings.backendUrl.replace('ws://', 'http://').replace('wss://', 'https://');
+      playAnnouncement(httpUrl, settings.stopMessage, settings.discussVoice); // fire-and-forget
+    } else {
+      playBeep(settings.micOffBeepFreq, settings.beepDuration, settings.beepVolume);
+    }
+  }, [sendControl, settings.announcementMode, settings.stopMessage, settings.discussVoice, settings.backendUrl, settings.micOffBeepFreq, settings.beepDuration, settings.beepVolume]);
+
+  // Countdown ref declared here so handleBeepsForCursorMode can reference it before useActivation
+  const countdownInProgressRef = useRef(false);
+
+  // Cursor position mode: play countdown beeps (or Elisabeth voice) before mic starts
+  // so user can switch to target app / position cursor before speaking.
+  const handleBeepsForCursorMode = useCallback(async () => {
+    const httpUrl = settings.backendUrl.replace('ws://', 'http://').replace('wss://', 'https://');
+    if (settings.announcementMode === 'voice') {
+      await playAnnouncement(httpUrl, settings.startMessage, settings.discussVoice);
+    }
+    // After announcement (or in beep-only mode), play countdown beeps as "go" signal
+    if (settings.countdownBeeps > 0) {
+      countdownInProgressRef.current = true;
+      await playCountdownBeeps(
+        {
+          count: settings.countdownBeeps,
+          intervalMs: settings.countdownIntervalMs,
+          freqStart: settings.beepFreqStart,
+          freqEnd: settings.beepFreqEnd,
+          duration: settings.beepDuration,
+          volume: settings.beepVolume,
+        },
+        (n) => setCountdown(n),
+      );
+      countdownInProgressRef.current = false;
+    }
+  }, [settings.announcementMode, settings.startMessage, settings.discussVoice, settings.backendUrl, settings.countdownBeeps, settings.countdownIntervalMs, settings.beepFreqStart, settings.beepFreqEnd, settings.beepDuration, settings.beepVolume]);
 
   const {
     recordingState,
@@ -168,6 +215,7 @@ function App() {
     hotkey: settings.hotkey,
     onStart: handleRecordingStart,
     onStop: handleRecordingStop,
+    onBeforeStart: settings.cursorPositionMode ? handleBeepsForCursorMode : undefined,
   });
 
   const { startRecording, stopRecording, audioStream, permissionState } =
@@ -295,17 +343,87 @@ function App() {
     }
   }, [lastResult, recordingState, setRecordingState]);
 
-  // Refiner: post-process transcription via LLM when enabled
-  const refinerResultRef = useRef<string | null>(null);
+  // Reset discuss conversation history when mode is toggled off
   useEffect(() => {
-    if (!lastResult || !settings.refiner.enabled) {
+    if (!settings.discussMode) {
+      discussHistoryRef.current = [];
+      setDiscussHistory([]);
+    }
+  }, [settings.discussMode]);
+
+  // Discuss mode: send transcription to AI and play back audio response
+  const discussResultRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!lastResult || !settings.discussMode) {
       return;
     }
-    // Avoid re-refining the same text
-    if (refinerResultRef.current === lastResult.text) {
+    if (discussResultRef.current === lastResult.text) {
+      return;
+    }
+    discussResultRef.current = lastResult.text;
+
+    setIsDiscussing(true);
+    setDiscussError(null);
+    setDiscussResult(null);
+
+    const backendHttp = settings.backendUrl
+      .replace('ws://', 'http://')
+      .replace('wss://', 'https://');
+
+    // Use ref to get the latest history synchronously (avoids stale closure race condition)
+    const currentHistory = discussHistoryRef.current;
+
+    fetch(`${backendHttp}/discuss/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        text: lastResult.text,
+        history: currentHistory,
+        voice: settings.discussVoice,
+      }),
+    })
+      .then(async (res) => {
+        if (res.ok) {
+          const data: DiscussResult = await res.json();
+          setDiscussResult(data);
+          // Append both user and assistant messages to history (update ref + state)
+          const newHistory = [
+            ...discussHistoryRef.current,
+            { role: 'user', content: lastResult.text },
+            { role: 'assistant', content: data.answer },
+          ];
+          discussHistoryRef.current = newHistory;
+          setDiscussHistory(newHistory);
+          // Play the audio response
+          const audio = new Audio(`${backendHttp}${data.audio_url}`);
+          audio.play().catch(() => {});
+        } else {
+          const errData = await res.json().catch(() => ({ error: 'Discuss failed' }));
+          setDiscussError(errData.error || 'Discuss failed');
+        }
+      })
+      .catch(() => {
+        setDiscussError('Could not reach discuss backend');
+      })
+      .finally(() => {
+        setIsDiscussing(false);
+      });
+  }, [lastResult, settings.discussMode, settings.discussVoice, settings.backendUrl]);
+
+  // Refiner: post-process transcription via LLM when enabled
+  const refinerResultRef = useRef<string | null>(null);
+  const refinerPromptRef = useRef<string>('');
+  useEffect(() => {
+    if (!lastResult || !settings.refiner.enabled || settings.discussMode) {
+      return;
+    }
+    // Avoid re-refining the same text with the same prompt
+    const promptChanged = refinerPromptRef.current !== settings.refiner.customPrompt;
+    if (refinerResultRef.current === lastResult.text && !promptChanged) {
       return;
     }
     refinerResultRef.current = lastResult.text;
+    refinerPromptRef.current = settings.refiner.customPrompt;
 
     setIsRefining(true);
     setRefinerError(null);
@@ -318,12 +436,19 @@ function App() {
     fetch(`${backendHttp}/refiner/process`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: lastResult.text }),
+      body: JSON.stringify({
+        text: lastResult.text,
+        ...(settings.refiner.customPrompt ? { custom_prompt: settings.refiner.customPrompt } : {}),
+      }),
     })
       .then(async (res) => {
         if (res.ok) {
           const data: RefinerResult = await res.json();
           setRefinerResult(data);
+          // Show warning as non-blocking error (e.g. rate limit fallback)
+          if (data.warning) {
+            setRefinerError(data.warning);
+          }
         } else {
           const errData = await res.json().catch(() => ({ detail: 'Refinement failed' }));
           setRefinerError(errData.detail || 'Refinement failed');
@@ -335,7 +460,7 @@ function App() {
       .finally(() => {
         setIsRefining(false);
       });
-  }, [lastResult, settings.refiner.enabled, settings.backendUrl]);
+  }, [lastResult, settings.refiner.enabled, settings.backendUrl, settings.refiner.customPrompt]);
 
   // Transition processing -> idle when an error arrives
   useEffect(() => {
@@ -374,30 +499,36 @@ function App() {
     }
   }, [recordingState, triggerStart, triggerStop]);
 
-  // Remote toggle: countdown beeps then start recording with VAD auto-stop
-  const countdownInProgressRef = useRef(false);
+  // Remote toggle: countdown beeps (or voice announcement) then start recording with VAD auto-stop
   const handleRemoteToggle = useCallback(async () => {
     if (recordingState === 'recording') {
       setRemoteTriggered(false);
       triggerStop();
     } else if (recordingState === 'idle' && !countdownInProgressRef.current) {
       countdownInProgressRef.current = true;
-      await playCountdownBeeps(
-        {
-          count: settings.countdownBeeps,
-          intervalMs: settings.countdownIntervalMs,
-          freqStart: settings.beepFreqStart,
-          freqEnd: settings.beepFreqEnd,
-          duration: settings.beepDuration,
-          volume: settings.beepVolume,
-        },
-        (n) => setCountdown(n),
-      );
+      const httpUrl = settings.backendUrl.replace('ws://', 'http://').replace('wss://', 'https://');
+      if (settings.announcementMode === 'voice') {
+        await playAnnouncement(httpUrl, settings.startMessage, settings.discussVoice);
+      }
+      // After announcement (or in beep-only mode), play countdown beeps as "go" signal
+      if (settings.countdownBeeps > 0) {
+        await playCountdownBeeps(
+          {
+            count: settings.countdownBeeps,
+            intervalMs: settings.countdownIntervalMs,
+            freqStart: settings.beepFreqStart,
+            freqEnd: settings.beepFreqEnd,
+            duration: settings.beepDuration,
+            volume: settings.beepVolume,
+          },
+          (n) => setCountdown(n),
+        );
+      }
       setRemoteTriggered(true);
       triggerStart();
       countdownInProgressRef.current = false;
     }
-  }, [recordingState, triggerStart, triggerStop, settings.countdownBeeps, settings.countdownIntervalMs, settings.beepFreqStart, settings.beepFreqEnd, settings.beepDuration, settings.beepVolume]);
+  }, [recordingState, triggerStart, triggerStop, settings.announcementMode, settings.startMessage, settings.discussVoice, settings.backendUrl, settings.countdownBeeps, settings.countdownIntervalMs, settings.beepFreqStart, settings.beepFreqEnd, settings.beepDuration, settings.beepVolume]);
 
   // Keep ref in sync for remote toggle
   useEffect(() => {
@@ -415,6 +546,36 @@ function App() {
   const handleRetry = useCallback(() => {
     connect();
   }, [connect]);
+
+  // On first load in PWA standalone mode, resize to a portrait-friendly size.
+  useEffect(() => {
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+    if (isStandalone) {
+      try { window.resizeTo(480, 700); } catch { /* ignored in regular tabs */ }
+    }
+  }, []);
+
+  // Mini mode window resize: shrink the browser window to fit the widget,
+  // restore on exit. Works in PWA / "Open as window" mode; silently ignored in tabs.
+  const prevWindowSizeRef = useRef<{ w: number; h: number } | null>(null);
+  useEffect(() => {
+    if (miniMode) {
+      prevWindowSizeRef.current = { w: window.outerWidth, h: window.outerHeight };
+      document.documentElement.style.height = 'auto';
+      document.body.style.height = 'auto';
+      document.body.style.overflow = 'hidden';
+      try { window.resizeTo(280, 110); } catch { /* ignored in regular tabs */ }
+    } else {
+      document.documentElement.style.height = '';
+      document.body.style.height = '';
+      document.body.style.overflow = '';
+      const prev = prevWindowSizeRef.current;
+      if (prev) {
+        try { window.resizeTo(prev.w, prev.h); } catch { /* ignored */ }
+        prevWindowSizeRef.current = null;
+      }
+    }
+  }, [miniMode]);
 
   // Mini mode: compact widget with logo + mic button + countdown
   if (miniMode) {
@@ -468,7 +629,7 @@ function App() {
           <img src="/bacon-ai-logo-black.png" alt="B" className="app-logo" />
           <div className="app-brand-text">
             <h1 className="app-title">ACON-AI</h1>
-            <span className="app-subtitle">SPEECH-TO-TEXT</span>
+            <span className="app-subtitle">SPEECH-TO-TEXT <span style={{ fontSize: '10px', opacity: 0.45, letterSpacing: '0.05em' }}>v{__APP_VERSION__}</span></span>
           </div>
         </div>
         <div className="app-header__right">
@@ -512,46 +673,111 @@ function App() {
       )}
 
       <main className="app-main">
-        <AudioCapture
-          recordingState={recordingState}
-          activationMode={settings.activationMode}
-          onToggle={handleToggle}
-          permissionState={permissionState}
-          hotkey={settings.hotkey}
-          audioLevel={audioLevel}
+        <HistorySidebar
+          history={history}
+          onDeleteEntry={(index) => setHistory((prev) => prev.filter((_, i) => i !== index))}
+          onEditEntry={(index, text) => setHistory((prev) => prev.map((item, i) => i === index ? { ...item, text } : item))}
+          discussHistory={discussHistory}
+          discussMode={settings.discussMode}
         />
 
-        <WaveformVisualizer
-          audioStream={audioStream}
-          isRecording={recordingState === 'recording'}
-        />
+        <div className="app-content">
+          <div className="tab-switcher">
+            <button
+              className={activeTab === 'live' ? 'tab-btn tab-btn--active' : 'tab-btn'}
+              onClick={() => setActiveTab('live')}
+            >
+              Live
+            </button>
+            <button
+              className={activeTab === 'file' ? 'tab-btn tab-btn--active' : 'tab-btn'}
+              onClick={() => setActiveTab('file')}
+            >
+              File
+            </button>
+            <button
+              className={activeTab === 'text' ? 'tab-btn tab-btn--active' : 'tab-btn'}
+              onClick={() => setActiveTab('text')}
+            >
+              Text
+            </button>
+          </div>
 
-        <ModelProgress progress={modelProgress} />
+          {activeTab === 'live' && (
+            <>
+              <AudioCapture
+                recordingState={recordingState}
+                activationMode={settings.activationMode}
+                onToggle={handleToggle}
+                permissionState={permissionState}
+                hotkey={settings.hotkey}
+                audioLevel={audioLevel}
+              />
 
-        <TranscriptionDisplay
-          lastResult={lastResult}
-          notificationsEnabled={settings.notificationsEnabled}
-          autoCopy={settings.autoCopy}
-          typeToKeyboard={settings.typeToKeyboard}
-          typingAutoFocus={settings.typingAutoFocus}
-          targetWindow={settings.targetWindow}
-          backendUrl={settings.backendUrl}
-          refinerEnabled={settings.refiner.enabled}
-          refinerResult={refinerResult}
-          isRefining={isRefining}
-          refinerError={refinerError}
-        />
+              <WaveformVisualizer
+                audioStream={audioStream}
+                isRecording={recordingState === 'recording'}
+              />
 
-        <SettingsPanel
-          settings={settings}
-          onUpdate={updateSettings}
-          onReset={resetSettings}
-          onExport={exportSettings}
-          onImport={importSettings}
-          isOpen={settingsOpen}
-          onClose={() => setSettingsOpen(false)}
-        />
+              <ModelProgress progress={modelProgress} />
+
+              <TranscriptionDisplay
+                lastResult={lastResult}
+                notificationsEnabled={settings.notificationsEnabled}
+                autoCopy={settings.autoCopy}
+                typeToKeyboard={settings.typeToKeyboard}
+                typingAutoFocus={settings.typingAutoFocus}
+                targetWindow={settings.targetWindow}
+                typingFocusDelay={settings.typingFocusDelay}
+                typingFlashWindow={settings.typingFlashWindow}
+                cursorPositionMode={settings.cursorPositionMode}
+                announcementMode={settings.announcementMode}
+                writeMessage={settings.writeMessage}
+                announcementVoice={settings.discussVoice}
+                backendUrl={settings.backendUrl}
+                refinerEnabled={settings.refiner.enabled}
+                refinerResult={refinerResult}
+                isRefining={isRefining}
+                refinerError={refinerError}
+                suppressActions={false}
+                discussResult={discussResult}
+                isDiscussing={isDiscussing}
+                discussError={discussError}
+                onHistoryUpdate={setHistory}
+                suffixInjections={settings.suffixInjections}
+                injectOnLive={settings.injectOnLive}
+                injectOnKeyboard={settings.injectOnKeyboard}
+              />
+            </>
+          )}
+
+          {activeTab === 'file' && (
+            <FileTranscriptionPanel settings={settings} backendUrl={settings.backendUrl} />
+          )}
+
+          {activeTab === 'text' && (
+            <TextEditorPanel settings={settings} backendUrl={settings.backendUrl} />
+          )}
+
+          <SettingsPanel
+            settings={settings}
+            onUpdate={updateSettings}
+            onReset={resetSettings}
+            onExport={exportSettings}
+            onImport={importSettings}
+            isOpen={settingsOpen}
+            onClose={() => setSettingsOpen(false)}
+          />
+        </div>
       </main>
+
+      <QuickControlsSidebar
+        settings={settings}
+        onUpdate={updateSettings}
+        backendUrl={settings.backendUrl}
+        isOpen={quickControlsOpen}
+        onToggle={() => setQuickControlsOpen((prev) => !prev)}
+      />
 
       <ErrorDisplay error={lastError} onRetry={handleRetry} />
 

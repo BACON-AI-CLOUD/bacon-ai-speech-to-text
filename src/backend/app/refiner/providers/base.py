@@ -19,10 +19,24 @@ class RefinerResult:
     model: str
     processing_time_ms: float = 0.0
     tokens_used: int = 0
+    warning: Optional[str] = None
 
 
 class BaseRefinerProvider(ABC):
     """Abstract base class for refiner providers."""
+
+    PROVIDER_DISPLAY_NAME: str = "Unknown"
+    REQUIRES_API_KEY: bool = True
+
+    @abstractmethod
+    async def list_models(self, custom_models: list[dict] | None = None) -> list[dict]:
+        """
+        Return available models for this provider.
+
+        Returns:
+            List of dicts with 'id' and 'name' keys.
+        """
+        ...
 
     @abstractmethod
     async def refine(
@@ -30,6 +44,7 @@ class BaseRefinerProvider(ABC):
         text: str,
         system_prompt: str,
         timeout: float = 5.0,
+        messages: list[dict] | None = None,
     ) -> RefinerResult:
         """
         Refine raw transcribed text using an LLM.
@@ -38,9 +53,21 @@ class BaseRefinerProvider(ABC):
             text: Raw transcribed text to refine.
             system_prompt: System prompt with refinement instructions.
             timeout: Request timeout in seconds.
+            messages: Optional pre-built message array. If provided, used
+                      instead of building [system, user] from text/system_prompt.
 
         Returns:
             RefinerResult with the refined text and metadata.
+        """
+        ...
+
+    @abstractmethod
+    async def test_connection(self) -> dict:
+        """
+        Test connectivity to this provider.
+
+        Returns:
+            Dict with 'ok' (bool), 'latency_ms' (float), and 'message' (str).
         """
         ...
 

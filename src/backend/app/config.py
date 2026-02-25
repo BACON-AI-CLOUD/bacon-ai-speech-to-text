@@ -15,11 +15,23 @@ from typing import Any, Dict, Optional
 logger = logging.getLogger(__name__)
 
 # =============================================================================
+# Version Detection (from src/version.json)
+# =============================================================================
+
+_version_file = Path(__file__).parent.parent.parent / "version.json"
+APP_VERSION = 0
+if _version_file.exists():
+    try:
+        APP_VERSION = json.loads(_version_file.read_text()).get("version", 0)
+    except (json.JSONDecodeError, OSError):
+        pass
+
+# =============================================================================
 # Server Settings
 # =============================================================================
 
 SERVER_HOST = "127.0.0.1"
-SERVER_PORT = 8765
+SERVER_PORT = int(os.environ.get("BACON_VOICE_BACKEND_PORT", 8700 + APP_VERSION))
 SERVER_VERSION = "0.1.0"
 
 # =============================================================================

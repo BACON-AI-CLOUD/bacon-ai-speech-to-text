@@ -167,8 +167,9 @@ class TestServerConstants:
     def test_host_is_localhost(self):
         assert SERVER_HOST == "127.0.0.1"
 
-    def test_port_is_8765(self):
-        assert SERVER_PORT == 8765
+    def test_port_is_version_based(self):
+        from app.config import APP_VERSION
+        assert SERVER_PORT == 8700 + APP_VERSION
 
     def test_version_format(self):
         """Version should be a semver-like string."""

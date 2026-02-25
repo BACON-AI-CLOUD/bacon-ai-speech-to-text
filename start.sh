@@ -1,31 +1,37 @@
 #!/bin/bash
 set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-echo "=== BACON-AI Voice ==="
+
+# Read version from version.json
+VERSION=$(python3 -c "import json; print(json.load(open('$SCRIPT_DIR/src/version.json'))['version'])" 2>/dev/null || echo 0)
+BACKEND_PORT=$((8700 + VERSION))
+FRONTEND_PORT=$((5000 + VERSION))
+
+echo "=== BACON-AI Voice (v${VERSION}) ==="
 
 # Pre-flight checks
 command -v python3 >/dev/null 2>&1 || { echo "ERROR: python3 not found"; exit 1; }
 command -v node >/dev/null 2>&1 || { echo "ERROR: node not found"; exit 1; }
 
 # Check ports
-if lsof -i :8765 >/dev/null 2>&1; then echo "WARNING: Port 8765 already in use"; fi
-if lsof -i :5173 >/dev/null 2>&1; then echo "WARNING: Port 5173 already in use"; fi
+if lsof -i :$BACKEND_PORT >/dev/null 2>&1; then echo "WARNING: Port $BACKEND_PORT already in use"; fi
+if lsof -i :$FRONTEND_PORT >/dev/null 2>&1; then echo "WARNING: Port $FRONTEND_PORT already in use"; fi
 
 # Start backend
-echo "[Backend] Starting on http://localhost:8765..."
+echo "[Backend] Starting on http://localhost:$BACKEND_PORT..."
 cd "$SCRIPT_DIR/src/backend"
-uv run uvicorn app.main:app --host 127.0.0.1 --port 8765 &
+uv run uvicorn app.main:app --host 127.0.0.1 --port $BACKEND_PORT &
 BACKEND_PID=$!
 
 # Start frontend
-echo "[Frontend] Starting on http://localhost:5173..."
+echo "[Frontend] Starting on http://localhost:$FRONTEND_PORT..."
 cd "$SCRIPT_DIR/src/frontend"
-npm run preview -- --port 5173 &
+npm run preview -- --port $FRONTEND_PORT &
 FRONTEND_PID=$!
 
 echo ""
-echo "Backend:  http://localhost:8765"
-echo "Frontend: http://localhost:5173"
+echo "Backend:  http://localhost:$BACKEND_PORT"
+echo "Frontend: http://localhost:$FRONTEND_PORT"
 echo "Press Ctrl+C to stop both services"
 
 cleanup() {

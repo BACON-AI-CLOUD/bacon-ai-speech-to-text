@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>BACON-AI Voice</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      width: 280px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 13px;
+      background: #1a1a1a;
+      color: #e0e0e0;
+      padding: 16px;
+    }
+    h1 { font-size: 15px; font-weight: 600; color: #DC5A28; margin-bottom: 14px; }
+    label { display: block; margin-bottom: 4px; font-size: 11px; color: #999; text-transform: uppercase; letter-spacing: 0.5px; }
+    input[type="text"], input[type="number"], select {
+      width: 100%; padding: 7px 10px; background: #2a2a2a; border: 1px solid #444;
+      border-radius: 6px; color: #e0e0e0; font-size: 13px; margin-bottom: 12px;
+    }
+    input:focus, select:focus { outline: none; border-color: #DC5A28; }
+    .shortcut-hint { font-size: 11px; color: #666; margin-top: -8px; margin-bottom: 12px; }
+    button {
+      width: 100%; padding: 9px; background: #DC5A28; border: none; border-radius: 6px;
+      color: #fff; font-size: 13px; font-weight: 600; cursor: pointer;
+    }
+    button:hover { background: #c44f22; }
+    .status { font-size: 11px; color: #666; text-align: center; margin-top: 10px; }
+    .status.saved { color: #4caf50; }
+  </style>
+</head>
+<body>
+  <h1>🥓 BACON-AI Voice</h1>
+
+  <label>Backend Port</label>
+  <input type="number" id="port" min="8700" max="9000" placeholder="8702">
+
+  <label>Keyboard Shortcut</label>
+  <input type="text" id="shortcut" placeholder="Ctrl+Shift+M">
+  <p class="shortcut-hint">e.g. Ctrl+Shift+M, Alt+V, Ctrl+Shift+Space</p>
+
+  <label>Whisper Model</label>
+  <select id="model">
+    <option value="tiny">tiny (fastest)</option>
+    <option value="base" selected>base (recommended)</option>
+    <option value="small">small</option>
+    <option value="medium">medium</option>
+    <option value="large-v3">large-v3 (most accurate)</option>
+  </select>
+
+  <label>Silence Timeout (ms)</label>
+  <input type="number" id="silenceMs" min="500" max="10000" step="500" placeholder="3000">
+
+  <label>Terminal Port (ttyd)</label>
+  <input type="number" id="ttyd-port" min="1024" max="65535" placeholder="7681">
+
+  <button id="save">Save Settings</button>
+  <p class="status" id="status"></p>
+
+  <script src="popup.js"></script>
+</body>
+</html>

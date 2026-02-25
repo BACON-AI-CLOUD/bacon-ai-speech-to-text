@@ -3,6 +3,17 @@
   padding-top: 12px;
 }
 
+.refiner-settings__quick-hint {
+  font-size: 0.78rem;
+  color: #666;
+  margin: 0 0 8px;
+  line-height: 1.4;
+}
+
+.refiner-settings__quick-hint strong {
+  color: #888;
+}
+
 .refiner-settings__toggle {
   width: 100%;
   background: none;
@@ -32,6 +43,28 @@
   flex-direction: column;
   gap: 12px;
   padding-top: 12px;
+}
+
+.refiner-settings__refresh-btn {
+  background: none;
+  border: 1px solid #2a2a3e;
+  border-radius: 4px;
+  color: #888;
+  font-size: 0.75rem;
+  cursor: pointer;
+  padding: 2px 8px;
+  margin-left: 8px;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.refiner-settings__refresh-btn:hover {
+  background: #1a1a2e;
+  color: #a0a0b8;
+}
+
+.refiner-settings__refresh-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .refiner-settings__prompt-toggle {
@@ -78,6 +111,16 @@
   color: #f44336;
 }
 
+.refiner-test-result__warning {
+  color: #ff9800;
+  background: #ff980015;
+  border: 1px solid #ff980033;
+  border-radius: 4px;
+  padding: 6px 10px;
+  margin-bottom: 8px;
+  font-size: 0.85em;
+}
+
 .refiner-test-result__row {
   margin-bottom: 6px;
 }
@@ -100,4 +143,93 @@
   font-size: 0.75rem;
   margin-top: 6px;
   text-align: right;
+}
+
+/* Test Connection */
+.btn--outline {
+  background: none;
+  border: 1px solid #2a2a3e;
+  border-radius: 6px;
+  color: #a0a0b8;
+  padding: 6px 14px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.btn--outline:hover {
+  background: #1a1a2e;
+  border-color: #3a3a5e;
+}
+
+.btn--outline:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.refiner-settings__connection-result {
+  font-size: 0.8rem;
+  margin-left: 8px;
+}
+
+.refiner-settings__connection-result--ok {
+  color: #4caf50;
+}
+
+.refiner-settings__connection-result--fail {
+  color: #f44336;
+}
+
+/* Template row: dropdown + delete button */
+.refiner-settings__template-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.refiner-settings__template-row .settings-select {
+  flex: 1;
+}
+
+.refiner-settings__delete-btn {
+  background: none;
+  border: 1px solid #3a2020;
+  border-radius: 4px;
+  color: #f44336;
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 4px 8px;
+  line-height: 1;
+  transition: background 0.2s ease;
+}
+
+.refiner-settings__delete-btn:hover {
+  background: #2a1515;
+}
+
+/* Prompt action buttons row */
+.refiner-settings__prompt-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+/* Reset to template default button */
+.refiner-settings__reset-prompt {
+  font-size: 0.75rem;
+  padding: 4px 10px;
+}
+
+/* Save-as-template inline row */
+.refiner-settings__save-prompt-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.refiner-settings__save-prompt-input {
+  width: 160px;
+  font-size: 0.75rem;
+  padding: 4px 8px;
 }

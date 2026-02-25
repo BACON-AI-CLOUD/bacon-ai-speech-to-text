@@ -17,13 +17,21 @@ describe('TextComparison', () => {
     vi.clearAllMocks();
   });
 
-  it('shows raw and refined side by side', () => {
+  it('shows refined text by default when available', () => {
     render(<TextComparison {...defaultProps} />);
 
-    expect(screen.getByText('hello world this is raw text')).toBeInTheDocument();
     expect(screen.getByText('Hello world, this is raw text.')).toBeInTheDocument();
-    expect(screen.getByText('Raw', { selector: '.text-comparison__panel-title' })).toBeInTheDocument();
     expect(screen.getByText('Refined', { selector: '.text-comparison__panel-title' })).toBeInTheDocument();
+  });
+
+  it('shows raw text when checkbox unchecked', () => {
+    render(<TextComparison {...defaultProps} />);
+
+    const checkbox = screen.getByTestId('use-refined-checkbox');
+    fireEvent.click(checkbox);
+
+    expect(screen.getByText('hello world this is raw text')).toBeInTheDocument();
+    expect(screen.getByText('Raw', { selector: '.text-comparison__panel-title' })).toBeInTheDocument();
   });
 
   it('shows only raw when no refined text', () => {
@@ -31,7 +39,6 @@ describe('TextComparison', () => {
 
     expect(screen.getByText('hello world this is raw text')).toBeInTheDocument();
     expect(screen.getByText('Use Text')).toBeInTheDocument();
-    expect(screen.queryByText('Use Refined')).not.toBeInTheDocument();
   });
 
   it('copy button copies to clipboard', async () => {
@@ -44,10 +51,10 @@ describe('TextComparison', () => {
 
     render(<TextComparison {...defaultProps} />);
 
-    const copyRawBtn = screen.getByTestId('copy-raw');
-    fireEvent.click(copyRawBtn);
+    const copyBtn = screen.getByTestId('copy-refined');
+    fireEvent.click(copyBtn);
 
-    expect(writeText).toHaveBeenCalledWith('hello world this is raw text');
+    expect(writeText).toHaveBeenCalledWith('Hello world, this is raw text.');
   });
 
   it('shows refining spinner', () => {
@@ -68,14 +75,5 @@ describe('TextComparison', () => {
 
     expect(screen.getByRole('alert')).toBeInTheDocument();
     expect(screen.getByText('Ollama connection refused')).toBeInTheDocument();
-  });
-
-  it('calls onSelectText when use button clicked', () => {
-    const onSelectText = vi.fn();
-    render(<TextComparison {...defaultProps} onSelectText={onSelectText} />);
-
-    fireEvent.click(screen.getByText('Use Refined'));
-
-    expect(onSelectText).toHaveBeenCalledWith('Hello world, this is raw text.');
   });
 });
