@@ -202,7 +202,11 @@ class Refiner:
 
         try:
             provider = self._get_provider(target)
-            result = await provider.refine(raw_text, prompt, self._timeout)
+            # Wrap in XML tags so the LLM treats it as data, not as instructions.
+            # This prevents prompt injection when speech contains command-like phrases
+            # (e.g. "do not translate", "ignore previous instructions").
+            wrapped_text = f"<transcription>\n{raw_text}\n</transcription>"
+            result = await provider.refine(wrapped_text, prompt, self._timeout)
             return result
         except Exception as e:
             error_msg = str(e)
